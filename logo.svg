@@ -1,0 +1,6 @@
+<!-- 占位 logo，请替换为真实 logo -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <rect width="128" height="128" rx="28" fill="#2563EB"/>
+  <circle cx="64" cy="50" r="20" fill="#fff"/>
+  <path d="M28 104c0-19.882 16.118-36 36-36s36 16.118 36 36" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+</svg>

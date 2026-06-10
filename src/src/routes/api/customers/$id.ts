@@ -1,0 +1,80 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { badRequest, ok, readJson, resolveUser } from '#/lib/auth'
+import { requireCustomer } from '#/lib/guards'
+import { deleteCustomer, updateCustomer } from '#/lib/repo/customers'
+import { listContacts } from '#/lib/repo/contacts'
+import { listFollowUps } from '#/lib/repo/followups'
+import { listOpportunities } from '#/lib/repo/opportunities'
+import { listTaskLinks } from '#/lib/repo/tasklinks'
+import type { CustomerStatus } from '#/lib/types'
+
+// GET    /apps/crm/api/customers/$id  详情（聚合联系人/跟进/商机/关联任务）
+// PATCH  /apps/crm/api/customers/$id  更新
+// DELETE /apps/crm/api/customers/$id  删除
+export const Route = createFileRoute('/api/customers/$id')({
+  server: {
+    handlers: {
+      GET: ({
+        request,
+        params,
+      }: {
+        request: Request
+        params: { id: string }
+      }) => {
+        const user = resolveUser(request)
+        const id = Number(params.id)
+        const g = requireCustomer(user, id)
+        if (g.deny) return g.deny
+        return ok({
+          customer: g.customer,
+          contacts: listContacts(id),
+          opportunities: listOpportunities(user, { customer_id: id }),
+          follow_ups: listFollowUps({ customer_id: id }),
+          task_links: listTaskLinks('customer', id),
+        })
+      },
+
+      PATCH: async ({
+        request,
+        params,
+      }: {
+        request: Request
+        params: { id: string }
+      }) => {
+        const user = resolveUser(request)
+        const id = Number(params.id)
+        const g = requireCustomer(user, id)
+        if (g.deny) return g.deny
+        const body = await readJson(request)
+        if (!body) return badRequest('请求体无效')
+        const b = body as Record<string, unknown>
+        const updated = updateCustomer(id, {
+          name: b.name as string | undefined,
+          company: b.company as string | undefined,
+          status: b.status as CustomerStatus | undefined,
+          source: b.source as string | undefined,
+          tags: b.tags as string | undefined,
+          note: b.note as string | undefined,
+          owner_id: b.owner_id != null ? Number(b.owner_id) : undefined,
+          next_follow_at: b.next_follow_at as string | undefined,
+        })
+        return ok(updated)
+      },
+
+      DELETE: ({
+        request,
+        params,
+      }: {
+        request: Request
+        params: { id: string }
+      }) => {
+        const user = resolveUser(request)
+        const id = Number(params.id)
+        const g = requireCustomer(user, id)
+        if (g.deny) return g.deny
+        deleteCustomer(id)
+        return ok({ deleted: true })
+      },
+    },
+  },
+})

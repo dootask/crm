@@ -1,0 +1,11 @@
+name:
+  en: CRM
+  zh: 客户关系管理
+description:
+  en: Manage customers, contacts and sales opportunities inside DooTask.
+  zh: 在 DooTask 中管理客户、联系人与销售商机。
+tags:
+  - crm
+  - customer
+  - 客户管理
+author: DooTask

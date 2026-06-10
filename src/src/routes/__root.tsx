@@ -1,5 +1,6 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { AppShell } from '#/components/app-shell'
+import { KeepAliveViews } from '#/components/keep-alive'
 
 import appCss from '../styles.css?url'
 
@@ -25,7 +26,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="font-sans antialiased">
-        <AppShell>{children}</AppShell>
+        <AppShell>
+          <KeepAliveViews />
+          {children}
+        </AppShell>
         <Scripts />
       </body>
     </html>

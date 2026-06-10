@@ -88,9 +88,11 @@ export function updateCustomer(
   const sets: Array<string> = []
   const params: Array<unknown> = []
   for (const key of PATCHABLE) {
-    if (key in patch) {
+    const v = (patch as Record<string, unknown>)[key]
+    // 仅更新「显式提供」的字段（undefined 跳过；null 表示清空）
+    if (v !== undefined) {
       sets.push(`${key} = ?`)
-      params.push((patch as Record<string, unknown>)[key] ?? null)
+      params.push(v)
     }
   }
   if (sets.length) {

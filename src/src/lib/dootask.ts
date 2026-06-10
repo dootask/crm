@@ -88,23 +88,47 @@ export function useDooTask(): DooTaskState {
   return state
 }
 
+export type PickUsersResult =
+  | { status: 'picked'; ids: Array<number> }
+  | { status: 'cancelled' }
+  | { status: 'standalone' }
+
 /**
- * 打开 DooTask 用户选择器，返回选中的用户 ID 列表。
- * 独立模式（非微前端）下返回 null，调用方应降级为手动输入。
+ * 打开 DooTask 用户选择器，返回判别式结果：
+ * - picked：用户点了「确定」，ids 为所选用户。
+ * - cancelled：用户关闭/取消选择器（点右上角关闭或未选），调用方应「不做任何修改」。
+ * - standalone：当前不在 DooTask 微前端环境，调用方应降级为手动输入。
+ *
+ * 注意 selectUsers 的参数是 `multipleMax`（之前误写成 max）；取消时它会 reject，
+ * 这里捕获并归为 cancelled，避免把「取消」当成「独立模式」而误弹手动输入。
  */
 export async function pickUsers(params?: {
   value?: Array<number>
   multiple?: boolean
-}): Promise<Array<number> | null> {
+}): Promise<PickUsersResult> {
+  let tools: typeof import('@dootask/tools')
   try {
-    const tools = await import('@dootask/tools')
-    if (!(await tools.isMicroApp())) return null
-    return await tools.selectUsers({
-      value: params?.value ?? [],
-      max: params?.multiple === false ? 1 : undefined,
-    } as Parameters<typeof tools.selectUsers>[0])
+    tools = await import('@dootask/tools')
   } catch {
-    return null
+    return { status: 'standalone' }
+  }
+  let micro = false
+  try {
+    micro = await tools.isMicroApp()
+  } catch {
+    micro = false
+  }
+  if (!micro) return { status: 'standalone' }
+  try {
+    const ids = await tools.selectUsers({
+      value: params?.value ?? [],
+      multipleMax: params?.multiple === false ? 1 : undefined,
+    } as Parameters<typeof tools.selectUsers>[0])
+    if (!Array.isArray(ids) || ids.length === 0) return { status: 'cancelled' }
+    return { status: 'picked', ids }
+  } catch {
+    // 用户关闭/取消选择器
+    return { status: 'cancelled' }
   }
 }
 

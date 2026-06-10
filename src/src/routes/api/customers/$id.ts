@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { badRequest, ok, readJson, resolveUser } from '#/lib/auth'
 import { requireCustomer } from '#/lib/guards'
 import { deleteCustomer, updateCustomer } from '#/lib/repo/customers'
+import { logEntityChanges } from '#/lib/changelog'
 import { listContacts } from '#/lib/repo/contacts'
 import { listFollowUps } from '#/lib/repo/followups'
 import { listOpportunities } from '#/lib/repo/opportunities'
@@ -48,6 +49,7 @@ export const Route = createFileRoute('/api/customers/$id')({
         const body = await readJson(request)
         if (!body) return badRequest('请求体无效')
         const b = body as Record<string, unknown>
+        const before = g.customer
         const updated = updateCustomer(id, {
           name: b.name as string | undefined,
           company: b.company as string | undefined,
@@ -58,6 +60,17 @@ export const Route = createFileRoute('/api/customers/$id')({
           owner_id: b.owner_id != null ? Number(b.owner_id) : undefined,
           next_follow_at: b.next_follow_at as string | undefined,
         })
+        // 自动记录本次修改为一条跟进
+        if (updated) {
+          await logEntityChanges({
+            entity: 'customer',
+            customerId: id,
+            before: before as unknown as Record<string, unknown>,
+            after: updated as unknown as Record<string, unknown>,
+            userId: user.userId,
+            token: request.headers.get('x-user-token'),
+          })
+        }
         return ok(updated)
       },
 

@@ -1,1 +1,3 @@
-.claude/
+# 会话/运行时状态（非项目文件），但保留 .claude/skills 等纳入版本管理
+.claude/scheduled_tasks.lock
+.claude/*.lock

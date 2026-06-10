@@ -15,6 +15,7 @@ import { useUserNames } from '#/lib/use-users'
 import { pickUsers } from '#/lib/dootask'
 import { useActivate } from '#/components/keep-alive'
 import { PageHeader, Loading, EmptyState } from '#/components/ui/misc'
+import { Pager, DEFAULT_PAGE_SIZE } from '#/components/ui/pager.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
@@ -42,10 +43,13 @@ export function OpportunitiesView({ active }: { active: boolean }) {
   const [customerMap, setCustomerMap] = useState<Map<number, string>>(new Map())
   const [error, setError] = useState<string | null>(null)
 
+  const [total, setTotal] = useState(0)
   const [stage, setStage] = useState<'all' | OpportunityStage>('all')
   const [status, setStatus] = useState<'all' | OpportunityStatus>('all')
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
   // 搜索防抖
   useEffect(() => {
@@ -60,31 +64,36 @@ export function OpportunitiesView({ active }: { active: boolean }) {
       if (stage !== 'all') params.set('stage', stage)
       if (status !== 'all') params.set('status', status)
       if (debounced) params.set('search', debounced)
-      const qs = params.toString()
-      const data = await api<Array<Opportunity>>(
-        `/opportunities${qs ? `?${qs}` : ''}`,
+      params.set('page', String(page))
+      params.set('pageSize', String(pageSize))
+      const res = await api<{ items: Array<Opportunity>; total: number }>(
+        `/opportunities?${params.toString()}`,
       )
-      setList(data)
+      setList(res.items)
+      setTotal(res.total)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : '加载失败')
       setList([])
+      setTotal(0)
     }
   }
 
   async function loadCustomers() {
     try {
-      const cs = await api<Array<Customer>>('/customers')
-      setCustomerMap(new Map(cs.map((c) => [c.id, c.name])))
+      const cs = await api<{ items: Array<Customer>; total: number }>(
+        '/customers',
+      )
+      setCustomerMap(new Map(cs.items.map((c) => [c.id, c.name])))
     } catch {
       /* 客户名解析失败时回退占位 */
     }
   }
 
-  // 初次挂载 + 筛选变化时加载
+  // 初次挂载 + 筛选 / 页码变化时加载
   useEffect(() => {
     reload()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, status, debounced])
+  }, [stage, status, debounced, page, pageSize])
 
   // 客户列表只需拉一次
   useEffect(() => {
@@ -98,6 +107,24 @@ export function OpportunitiesView({ active }: { active: boolean }) {
     loadCustomers()
   })
 
+  // 筛选 / 每页条数变化回到第 1 页（在事件里重置，避免与查询 effect 级联）。
+  function changeStage(v: 'all' | OpportunityStage) {
+    setStage(v)
+    setPage(1)
+  }
+  function changeStatus(v: 'all' | OpportunityStatus) {
+    setStatus(v)
+    setPage(1)
+  }
+  function changeSearch(v: string) {
+    setSearch(v)
+    setPage(1)
+  }
+  function changePageSize(n: number) {
+    setPageSize(n)
+    setPage(1)
+  }
+
   const ownerIds = useMemo(
     () => (list ? list.map((o) => o.owner_id) : []),
     [list],
@@ -109,15 +136,25 @@ export function OpportunitiesView({ active }: { active: boolean }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div>
       <PageHeader
         title="商机"
         action={<NewOpportunityDialog onCreated={reload} />}
       />
 
       {/* 筛选 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={stage} onValueChange={(v) => setStage(v as typeof stage)}>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Input
+          value={search}
+          onChange={(e) => changeSearch(e.target.value)}
+          placeholder="搜索商机标题…"
+          className="w-full sm:max-w-xs"
+        />
+
+        <Select
+          value={stage}
+          onValueChange={(v) => changeStage(v as typeof stage)}
+        >
           <SelectTrigger className="w-36">
             <SelectValue placeholder="阶段" />
           </SelectTrigger>
@@ -135,7 +172,7 @@ export function OpportunitiesView({ active }: { active: boolean }) {
 
         <Select
           value={status}
-          onValueChange={(v) => setStatus(v as typeof status)}
+          onValueChange={(v) => changeStatus(v as typeof status)}
         >
           <SelectTrigger className="w-36">
             <SelectValue placeholder="状态" />
@@ -151,16 +188,13 @@ export function OpportunitiesView({ active }: { active: boolean }) {
             )}
           </SelectContent>
         </Select>
-
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜索商机标题…"
-          className="w-56"
-        />
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <div className="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       {list === null ? (
         <Loading />
@@ -170,42 +204,52 @@ export function OpportunitiesView({ active }: { active: boolean }) {
           hint="调整筛选条件，或点击右上角新建商机。"
         />
       ) : (
-        <Card>
-          <CardContent className="divide-y p-0">
-            {list.map((o) => (
-              <div
-                key={o.id}
-                className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3"
-              >
-                <Link
-                  to="/opportunities/$id"
-                  params={{ id: String(o.id) }}
-                  className="min-w-40 flex-1 font-medium hover:underline"
-                >
-                  {o.title}
-                </Link>
-                <span className="text-sm text-muted-foreground">
-                  {customerName(o.customer_id)}
-                </span>
-                <StageBadge stage={o.stage} />
-                <OppStatusBadge status={o.status} />
-                <span className="text-sm">{formatMoney(o.amount)}</span>
-                <span className="text-xs text-muted-foreground">
-                  {nameOf(o.owner_id)}
-                </span>
-                <span
-                  className={
-                    isOverdue(o.next_follow_at)
-                      ? 'text-xs font-medium text-destructive'
-                      : 'text-xs text-muted-foreground'
-                  }
-                >
-                  下次跟进：{formatDate(o.next_follow_at)}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <>
+          <Card className="py-0">
+            <CardContent className="p-0">
+              <ul className="divide-y">
+                {list.map((o) => (
+                  <li key={o.id}>
+                    <Link
+                      to="/opportunities/$id"
+                      params={{ id: String(o.id) }}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition hover:bg-accent/50"
+                    >
+                      <span className="min-w-40 flex-1 font-medium">
+                        {o.title}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {customerName(o.customer_id)}
+                      </span>
+                      <StageBadge stage={o.stage} />
+                      <OppStatusBadge status={o.status} />
+                      <span className="text-sm">{formatMoney(o.amount)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {nameOf(o.owner_id)}
+                      </span>
+                      <span
+                        className={
+                          isOverdue(o.next_follow_at)
+                            ? 'text-xs font-medium text-red-600 dark:text-red-400'
+                            : 'text-xs text-muted-foreground'
+                        }
+                      >
+                        下次跟进：{formatDate(o.next_follow_at)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+          <Pager
+            total={total}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={changePageSize}
+          />
+        </>
       )}
     </div>
   )
@@ -223,7 +267,9 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
   const [expectedCloseAt, setExpectedCloseAt] = useState<string | undefined>(
     undefined,
   )
-  const [nextFollowAt, setNextFollowAt] = useState<string | undefined>(undefined)
+  const [nextFollowAt, setNextFollowAt] = useState<string | undefined>(
+    undefined,
+  )
   const [ownerId, setOwnerId] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -241,8 +287,8 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
     setOwnerId(null)
     setError(null)
     setBusy(false)
-    api<Array<Customer>>('/customers')
-      .then(setCustomers)
+    api<{ items: Array<Customer>; total: number }>('/customers')
+      .then((res) => setCustomers(res.items))
       .catch(() => setCustomers([]))
   }, [open])
 

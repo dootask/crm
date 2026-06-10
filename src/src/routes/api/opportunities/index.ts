@@ -17,14 +17,25 @@ export const Route = createFileRoute('/api/opportunities/')({
         const sp = new URL(request.url).searchParams
         const customerId = parseInt(sp.get('customer_id') || '', 10)
         const ownerId = parseInt(sp.get('owner_id') || '', 10)
+        const page = parseInt(sp.get('page') || '', 10)
+        const pageSize = parseInt(sp.get('pageSize') || '', 10)
+        // 同时给出有效 page+pageSize 才分页；否则返回全部。
+        const paged =
+          Number.isFinite(page) && Number.isFinite(pageSize) && pageSize > 0
         return ok(
-          listOpportunities(user, {
-            customer_id: Number.isFinite(customerId) ? customerId : undefined,
-            stage: sp.get('stage') || undefined,
-            status: sp.get('status') || undefined,
-            owner_id: Number.isFinite(ownerId) ? ownerId : undefined,
-            search: sp.get('search') || undefined,
-          }),
+          listOpportunities(
+            user,
+            {
+              customer_id: Number.isFinite(customerId) ? customerId : undefined,
+              stage: sp.get('stage') || undefined,
+              status: sp.get('status') || undefined,
+              owner_id: Number.isFinite(ownerId) ? ownerId : undefined,
+              search: sp.get('search') || undefined,
+            },
+            paged
+              ? { limit: pageSize, offset: (Math.max(1, page) - 1) * pageSize }
+              : {},
+          ),
         )
       },
 

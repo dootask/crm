@@ -29,7 +29,7 @@ export const Route = createFileRoute('/api/customers/$id')({
         return ok({
           customer: g.customer,
           contacts: listContacts(id),
-          opportunities: listOpportunities(user, { customer_id: id }),
+          opportunities: listOpportunities(user, { customer_id: id }).items,
           follow_ups: listFollowUps({ customer_id: id }),
           task_links: listTaskLinks('customer', id),
         })

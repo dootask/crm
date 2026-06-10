@@ -16,7 +16,9 @@ export interface CustomerInput {
 export function listCustomers(
   user: AuthUser,
   filter: { search?: string; status?: string; owner_id?: number } = {},
-): Array<Customer> {
+  // 不传 limit 时返回全部（供下拉/映射等场景）；传 limit 则分页。
+  page: { limit?: number; offset?: number } = {},
+): { items: Array<Customer>; total: number } {
   const scope = ownerScope(user)
   const where: Array<string> = [scope.clause]
   const params: Array<unknown> = [...scope.params]
@@ -34,11 +36,21 @@ export function listCustomers(
     const like = `%${filter.search}%`
     params.push(like, like, like)
   }
-  return getDb()
-    .prepare(
-      `SELECT * FROM customers WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC`,
-    )
-    .all(...params) as Array<Customer>
+  const whereSql = where.join(' AND ')
+  const db = getDb()
+  const total = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM customers WHERE ${whereSql}`)
+      .get(...params) as { n: number }
+  ).n
+  let sql = `SELECT * FROM customers WHERE ${whereSql} ORDER BY updated_at DESC, id DESC`
+  const qparams = [...params]
+  if (page.limit != null) {
+    sql += ' LIMIT ? OFFSET ?'
+    qparams.push(page.limit, page.offset ?? 0)
+  }
+  const items = db.prepare(sql).all(...qparams) as Array<Customer>
+  return { items, total }
 }
 
 export function getCustomer(id: number): Customer | undefined {

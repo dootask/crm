@@ -34,6 +34,7 @@ import { Field } from '#/components/ui/form-field.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { CustomerStatusBadge, ToneBadge } from '#/components/ui/badge.tsx'
 import { PageHeader, Loading, EmptyState } from '#/components/ui/misc'
+import { Pager, DEFAULT_PAGE_SIZE } from '#/components/ui/pager.tsx'
 
 const STATUS_KEYS = Object.keys(CUSTOMER_STATUS) as Array<CustomerStatus>
 
@@ -47,29 +48,39 @@ function splitTags(tags: string | null): Array<string> {
 
 export function CustomersView({ active }: { active: boolean }) {
   const [list, setList] = useState<Array<Customer>>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [debounced, setDebounced] = useState('')
   const [status, setStatus] = useState<string>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [createOpen, setCreateOpen] = useState(false)
 
-  // 最新筛选条件 ref，供 reloadList / 防抖使用，避免闭包过期。
-  const searchRef = useRef(search)
-  searchRef.current = search
+  // 最新查询条件 ref，供 reloadList / 保活刷新读取，避免闭包过期。
+  const debouncedRef = useRef(debounced)
+  debouncedRef.current = debounced
   const statusRef = useRef(status)
   statusRef.current = status
+  const pageRef = useRef(page)
+  pageRef.current = page
+  const pageSizeRef = useRef(pageSize)
+  pageSizeRef.current = pageSize
 
   async function reloadList() {
     setError(null)
     try {
       const params = new URLSearchParams()
-      if (searchRef.current.trim()) params.set('search', searchRef.current.trim())
+      if (debouncedRef.current) params.set('search', debouncedRef.current)
       if (statusRef.current !== 'all') params.set('status', statusRef.current)
-      const qs = params.toString()
-      const data = await api<Array<Customer>>(
-        `/customers${qs ? `?${qs}` : ''}`,
+      params.set('page', String(pageRef.current))
+      params.set('pageSize', String(pageSizeRef.current))
+      const res = await api<{ items: Array<Customer>; total: number }>(
+        `/customers?${params.toString()}`,
       )
-      setList(data)
+      setList(res.items)
+      setTotal(res.total)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : '加载失败')
     } finally {
@@ -77,23 +88,34 @@ export function CustomersView({ active }: { active: boolean }) {
     }
   }
 
-  // 首次挂载加载一次。
+  // 搜索输入防抖 250ms。
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 250)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // 查询条件或页码变化时加载（含首次挂载）。
   useEffect(() => {
     reloadList()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [debounced, status, page, pageSize])
 
-  // 搜索 / 状态变化：防抖 250ms 触发查询。
-  useEffect(() => {
-    const t = setTimeout(() => {
-      reloadList()
-    }, 250)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status])
-
-  // 切回本视图时后台刷新。
+  // 切回本视图时后台刷新当前页。
   useActivate(active, reloadList)
+
+  // 筛选 / 每页条数变化回到第 1 页（在事件里重置，避免与查询 effect 级联）。
+  function changeSearch(v: string) {
+    setSearch(v)
+    setPage(1)
+  }
+  function changeStatus(v: string) {
+    setStatus(v)
+    setPage(1)
+  }
+  function changePageSize(n: number) {
+    setPageSize(n)
+    setPage(1)
+  }
 
   const nameOf = useUserNames(list.map((c) => c.owner_id))
 
@@ -116,11 +138,11 @@ export function CustomersView({ active }: { active: boolean }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => changeSearch(e.target.value)}
           placeholder="搜索客户名称 / 公司…"
           className="w-full sm:max-w-xs"
         />
-        <Select value={status} onValueChange={setStatus}>
+        <Select value={status} onValueChange={changeStatus}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="状态" />
           </SelectTrigger>
@@ -144,61 +166,67 @@ export function CustomersView({ active }: { active: boolean }) {
       {loading ? (
         <Loading />
       ) : list.length === 0 ? (
-        <EmptyState
-          title="暂无客户"
-          hint="点击右上角「新建客户」开始录入"
-        />
+        <EmptyState title="暂无客户" hint="点击右上角「新建客户」开始录入" />
       ) : (
-        <Card className="py-0">
-          <CardContent className="p-0">
-            <ul className="divide-y">
-              {list.map((c) => {
-                const overdue = isOverdue(c.next_follow_at)
-                const tags = splitTags(c.tags)
-                return (
-                  <li key={c.id}>
-                    <Link
-                      to="/customers/$id"
-                      params={{ id: String(c.id) }}
-                      className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition hover:bg-accent/50"
-                    >
-                      <span className="min-w-32 flex-1 font-medium">
-                        {c.name}
-                      </span>
-                      {c.company && (
-                        <span className="text-sm text-muted-foreground">
-                          {c.company}
-                        </span>
-                      )}
-                      <CustomerStatusBadge status={c.status} />
-                      <span className="text-xs text-muted-foreground">
-                        负责人：{nameOf(c.owner_id)}
-                      </span>
-                      <span
-                        className={
-                          overdue
-                            ? 'text-xs font-medium text-red-600 dark:text-red-400'
-                            : 'text-xs text-muted-foreground'
-                        }
+        <>
+          <Card className="py-0">
+            <CardContent className="p-0">
+              <ul className="divide-y">
+                {list.map((c) => {
+                  const overdue = isOverdue(c.next_follow_at)
+                  const tags = splitTags(c.tags)
+                  return (
+                    <li key={c.id}>
+                      <Link
+                        to="/customers/$id"
+                        params={{ id: String(c.id) }}
+                        className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition hover:bg-accent/50"
                       >
-                        下次跟进：{formatDate(c.next_follow_at)}
-                      </span>
-                      {tags.length > 0 && (
-                        <span className="flex flex-wrap gap-1">
-                          {tags.map((t) => (
-                            <ToneBadge key={t} tone="violet">
-                              {t}
-                            </ToneBadge>
-                          ))}
+                        <span className="min-w-32 flex-1 font-medium">
+                          {c.name}
                         </span>
-                      )}
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          </CardContent>
-        </Card>
+                        {c.company && (
+                          <span className="text-sm text-muted-foreground">
+                            {c.company}
+                          </span>
+                        )}
+                        <CustomerStatusBadge status={c.status} />
+                        <span className="text-xs text-muted-foreground">
+                          负责人：{nameOf(c.owner_id)}
+                        </span>
+                        <span
+                          className={
+                            overdue
+                              ? 'text-xs font-medium text-red-600 dark:text-red-400'
+                              : 'text-xs text-muted-foreground'
+                          }
+                        >
+                          下次跟进：{formatDate(c.next_follow_at)}
+                        </span>
+                        {tags.length > 0 && (
+                          <span className="flex flex-wrap gap-1">
+                            {tags.map((t) => (
+                              <ToneBadge key={t} tone="violet">
+                                {t}
+                              </ToneBadge>
+                            ))}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+          <Pager
+            total={total}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={changePageSize}
+          />
+        </>
       )}
     </div>
   )
@@ -220,7 +248,9 @@ function CreateCustomerDialog({
   const [tags, setTags] = useState('')
   const [note, setNote] = useState('')
   const [ownerId, setOwnerId] = useState<number | null>(null)
-  const [nextFollowAt, setNextFollowAt] = useState<string | undefined>(undefined)
+  const [nextFollowAt, setNextFollowAt] = useState<string | undefined>(
+    undefined,
+  )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

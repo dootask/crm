@@ -28,7 +28,9 @@ export function listOpportunities(
     owner_id?: number
     search?: string
   } = {},
-): Array<Opportunity> {
+  // 不传 limit 时返回全部；传 limit 则分页。
+  page: { limit?: number; offset?: number } = {},
+): { items: Array<Opportunity>; total: number } {
   const scope = ownerScope(user)
   const where: Array<string> = [scope.clause]
   const params: Array<unknown> = [...scope.params]
@@ -52,11 +54,21 @@ export function listOpportunities(
     where.push('title LIKE ?')
     params.push(`%${filter.search}%`)
   }
-  return getDb()
-    .prepare(
-      `SELECT * FROM opportunities WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC`,
-    )
-    .all(...params) as Array<Opportunity>
+  const whereSql = where.join(' AND ')
+  const db = getDb()
+  const total = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM opportunities WHERE ${whereSql}`)
+      .get(...params) as { n: number }
+  ).n
+  let sql = `SELECT * FROM opportunities WHERE ${whereSql} ORDER BY updated_at DESC, id DESC`
+  const qparams = [...params]
+  if (page.limit != null) {
+    sql += ' LIMIT ? OFFSET ?'
+    qparams.push(page.limit, page.offset ?? 0)
+  }
+  const items = db.prepare(sql).all(...qparams) as Array<Opportunity>
+  return { items, total }
 }
 
 export function getOpportunity(id: number): Opportunity | undefined {

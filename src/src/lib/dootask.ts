@@ -132,6 +132,48 @@ export async function pickUsers(params?: {
   }
 }
 
+/**
+ * 通过主程序下载文件（@dootask/tools 的 downloadUrl）。
+ * 我们的备份下载接口不校验 DooTask token，故传 token:false 避免附加 token。
+ * 独立模式回退到浏览器直接打开。
+ */
+export async function downloadViaDooTask(url: string): Promise<void> {
+  try {
+    const tools = await import('@dootask/tools')
+    if (!(await tools.isMicroApp())) {
+      window.open(url, '_blank')
+      return
+    }
+    await tools.downloadUrl({ url, token: false })
+  } catch {
+    try {
+      window.open(url, '_blank')
+    } catch {
+      /* 忽略 */
+    }
+  }
+}
+
+/** 二次确认对话框，返回是否确认。独立模式回退到 window.confirm。 */
+export async function confirmDialog(opts: {
+  title: string
+  content?: string
+  okText?: string
+  cancelText?: string
+}): Promise<boolean> {
+  try {
+    const tools = await import('@dootask/tools')
+    if (!(await tools.isMicroApp())) {
+      return window.confirm(
+        opts.content ? `${opts.title}\n${opts.content}` : opts.title,
+      )
+    }
+    return await tools.modalConfirm(opts)
+  } catch {
+    return false
+  }
+}
+
 /** 在 DooTask 中打开指定任务。独立模式下静默失败。 */
 export async function openDooTaskTask(taskId: number): Promise<void> {
   try {

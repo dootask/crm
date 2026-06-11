@@ -176,7 +176,11 @@ export function CustomersView({ active }: { active: boolean }) {
       )}
 
       {loading ? (
-        <Loading />
+        <Card className="py-0">
+          <CardContent className="p-0">
+            <Loading center />
+          </CardContent>
+        </Card>
       ) : list.length === 0 ? (
         <EmptyState title="暂无客户" hint="点击右上角「新建客户」开始录入" />
       ) : (

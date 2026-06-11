@@ -1,6 +1,10 @@
-<!-- 占位 logo，请替换为真实 logo -->
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
-  <rect width="128" height="128" rx="28" fill="#2563EB"/>
-  <circle cx="64" cy="50" r="20" fill="#fff"/>
-  <path d="M28 104c0-19.882 16.118-36 36-36s36 16.118 36 36" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="112" fill="#4F46E5"/>
+  <rect x="112" y="128" width="288" height="256" rx="40" fill="#FFFFFF"/>
+  <circle cx="206" cy="224" r="44" fill="#C7D2FE"/>
+  <path d="M144 326C154 288 180 270 206 270C232 270 258 288 268 326" fill="#4F46E5"/>
+  <rect x="292" y="190" width="64" height="18" rx="9" fill="#4F46E5"/>
+  <rect x="292" y="236" width="76" height="18" rx="9" fill="#A5B4FC"/>
+  <rect x="292" y="282" width="52" height="18" rx="9" fill="#A5B4FC"/>
+  <path d="M338 340L370 372L424 308" stroke="#22C55E" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

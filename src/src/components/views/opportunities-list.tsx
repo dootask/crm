@@ -209,7 +209,11 @@ export function OpportunitiesView({ active }: { active: boolean }) {
       )}
 
       {list === null ? (
-        <Loading />
+        <Card className="py-0">
+          <CardContent className="p-0">
+            <Loading center />
+          </CardContent>
+        </Card>
       ) : list.length === 0 ? (
         <EmptyState
           title="暂无商机"

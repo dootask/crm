@@ -18,8 +18,17 @@ function adminIds(): Array<number> {
  * DooTaskClient 以 x-user-token 反查主程序确认身份。
  */
 export function resolveUser(request: Request): AuthUser {
-  const header = request.headers.get('x-user-id')
-  const parsed = header ? parseInt(header, 10) : NaN
+  let raw = request.headers.get('x-user-id')
+  // 浏览器直接下载（@dootask/tools downloadUrl 发起的 GET）无法带自定义头，
+  // 退而从查询参数 ?uid= 取身份；与「信任前端传入 user-id」的轻量模型一致。
+  if (!raw) {
+    try {
+      raw = new URL(request.url).searchParams.get('uid')
+    } catch {
+      /* URL 解析失败忽略 */
+    }
+  }
+  const parsed = raw ? parseInt(raw, 10) : NaN
   const admins = adminIds()
   const fallback = admins[0] ?? 1
   const userId = Number.isFinite(parsed) ? parsed : fallback

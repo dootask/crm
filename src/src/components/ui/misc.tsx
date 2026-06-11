@@ -31,9 +31,20 @@ export function Spinner({ className }: { className?: string }) {
   )
 }
 
-export function Loading({ label = '加载中…' }: { label?: string }) {
+export function Loading({
+  label = '加载中…',
+  center = false,
+}: {
+  label?: string
+  center?: boolean
+}) {
   return (
-    <div className="flex items-center gap-2 py-10 text-sm text-zinc-500">
+    <div
+      className={cn(
+        'flex items-center gap-2 py-10 text-sm text-zinc-500',
+        center && 'justify-center',
+      )}
+    >
       <Spinner /> {label}
     </div>
   )

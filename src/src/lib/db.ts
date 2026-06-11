@@ -20,13 +20,31 @@ export function seedOwnerId(): number {
 export function getDb(): Database.Database {
   if (_db) return _db
   mkdirSync(DATA_DIR, { recursive: true })
-  const db = new Database(resolve(DATA_DIR, 'crm.db'))
+  const db = new Database(dbFilePath())
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   migrate(db)
   seed(db)
   _db = db
   return db
+}
+
+/** 数据目录（备份文件写在其下的 backups/）。 */
+export function dataDir(): string {
+  return DATA_DIR
+}
+
+/** 主数据库文件路径。 */
+export function dbFilePath(): string {
+  return resolve(DATA_DIR, 'crm.db')
+}
+
+/** 关闭当前连接并清空缓存，下次 getDb() 会重新打开（还原后需要）。 */
+export function closeDb(): void {
+  if (_db) {
+    _db.close()
+    _db = null
+  }
 }
 
 function migrate(db: Database.Database) {

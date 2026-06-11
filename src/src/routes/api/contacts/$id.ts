@@ -1,16 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  badRequest,
-  ok,
-  readJson,
-  resolveUser,
-} from '#/lib/auth'
+import { badRequest, ok, readJson, resolveUser } from '#/lib/auth'
 import { requireCustomer } from '#/lib/guards'
-import {
-  deleteContact,
-  getContact,
-  updateContact,
-} from '#/lib/repo/contacts'
+import { deleteContact, getContact, updateContact } from '#/lib/repo/contacts'
 
 // PATCH/DELETE /apps/crm/api/contacts/$id
 export const Route = createFileRoute('/api/contacts/$id')({
@@ -30,7 +21,7 @@ export const Route = createFileRoute('/api/contacts/$id')({
         if (g.deny) return g.deny
         const body = await readJson(request)
         if (!body) return badRequest('请求体无效')
-        const b = body as Record<string, unknown>
+        const b = body
         const updated = updateContact(contact.id, {
           name: b.name as string | undefined,
           title: b.title as string | undefined,

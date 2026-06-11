@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type * as DooTaskTools from '@dootask/tools'
 import { setAuth } from '#/lib/api'
 
 export interface DooTaskUser {
@@ -63,13 +64,13 @@ export function useDooTask(): DooTaskState {
         // 写入全局鉴权状态，供 lib/api 的 api() 自动带上身份头。
         setAuth({
           userId: typedUser.userid,
-          token: (token as string | null) ?? null,
+          token: token ?? null,
         })
         if (!cancelled) {
           setState({
             status: 'ready',
             user: typedUser,
-            token: (token as string | null) ?? null,
+            token: token ?? null,
           })
         }
       } catch (e) {
@@ -109,7 +110,7 @@ export async function pickUsers(params?: {
   value?: Array<number>
   multiple?: boolean
 }): Promise<PickUsersResult> {
-  let tools: typeof import('@dootask/tools')
+  let tools: typeof DooTaskTools
   try {
     tools = await import('@dootask/tools')
   } catch {
@@ -126,7 +127,7 @@ export async function pickUsers(params?: {
     const ids = await tools.selectUsers({
       value: params?.value ?? [],
       multipleMax: params?.multiple === false ? 1 : undefined,
-    } as Parameters<typeof tools.selectUsers>[0])
+    })
     if (!Array.isArray(ids) || ids.length === 0) return { status: 'cancelled' }
     return { status: 'picked', ids }
   } catch {

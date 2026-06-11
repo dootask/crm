@@ -9,7 +9,12 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useActivate } from '#/components/keep-alive'
-import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card.tsx'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '#/components/ui/card.tsx'
 import { ToneBadge } from '#/components/ui/badge.tsx'
 import { EmptyState, Loading, PageHeader } from '#/components/ui/misc.tsx'
 import { ApiError, api } from '#/lib/api'
@@ -100,7 +105,6 @@ export function DashboardView({ active }: { active: boolean }) {
 
   useEffect(() => {
     reload()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useActivate(active, reload)
@@ -167,8 +171,7 @@ export function DashboardView({ active }: { active: boolean }) {
               ) : (
                 <ul className="divide-y">
                   {items.map((item) => {
-                    const Icon =
-                      item.kind === 'customer' ? Users : Target
+                    const Icon = item.kind === 'customer' ? Users : Target
                     const overdue = item.overdue === 1
                     return (
                       <li key={`${item.kind}-${item.id}`}>

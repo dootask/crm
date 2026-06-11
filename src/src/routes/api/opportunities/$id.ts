@@ -1,10 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { badRequest, ok, readJson, resolveUser } from '#/lib/auth'
 import { requireOpportunity } from '#/lib/guards'
-import {
-  deleteOpportunity,
-  updateOpportunity,
-} from '#/lib/repo/opportunities'
+import { deleteOpportunity, updateOpportunity } from '#/lib/repo/opportunities'
 import { logEntityChanges, shouldNotify } from '#/lib/changelog'
 import { notifyTaskLinks } from '#/lib/notify'
 import { getCustomer } from '#/lib/repo/customers'
@@ -47,8 +44,11 @@ export const Route = createFileRoute('/api/opportunities/$id')({
         if (g.deny) return g.deny
         const body = await readJson(request)
         if (!body) return badRequest('请求体无效')
-        const b = body as Record<string, unknown>
-        if (b.stage != null && !isActiveValue('opportunity_stage', String(b.stage)))
+        const b = body
+        if (
+          b.stage != null &&
+          !isActiveValue('opportunity_stage', String(b.stage))
+        )
           return badRequest('商机阶段无效')
         const before = g.opportunity
         const updated = updateOpportunity(g.opportunity.id, {
@@ -77,7 +77,11 @@ export const Route = createFileRoute('/api/opportunities/$id')({
             token: request.headers.get('x-user-token'),
           })
           if (change && shouldNotify('opportunity', change.changed)) {
-            void notifyTaskLinks('opportunity', before.id, `✏️ ${change.content}`)
+            void notifyTaskLinks(
+              'opportunity',
+              before.id,
+              `✏️ ${change.content}`,
+            )
           }
         }
         return ok(updated)

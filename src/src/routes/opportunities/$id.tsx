@@ -44,10 +44,8 @@ import { BreadcrumbBar } from '#/components/detail/breadcrumb-bar.tsx'
 import { OwnerInlineEdit } from '#/components/detail/owner-field.tsx'
 import { InlineDateEdit } from '#/components/detail/inline-date-field.tsx'
 import { messageError, messageSuccess, messageWarning } from '#/lib/message'
-import {
-  FollowUpsSection,
-  type FollowUpsHandle,
-} from '#/components/detail/follow-ups-section.tsx'
+import { FollowUpsSection } from '#/components/detail/follow-ups-section.tsx'
+import type { FollowUpsHandle } from '#/components/detail/follow-ups-section.tsx'
 import { TaskLinksSection } from '#/components/detail/task-links-section.tsx'
 
 export const Route = createFileRoute('/opportunities/$id')({
@@ -86,7 +84,10 @@ function OpportunityDetailPage() {
 
   const ownerIds = useMemo(() => {
     if (!data) return []
-    return [data.opportunity.owner_id, ...data.follow_ups.map((f) => f.follow_by)]
+    return [
+      data.opportunity.owner_id,
+      ...data.follow_ups.map((f) => f.follow_by),
+    ]
   }, [data])
   const nameOf = useUserNames(ownerIds)
 
@@ -120,7 +121,9 @@ function OpportunityDetailPage() {
   }
 
   async function remove() {
-    if (!window.confirm(`确定删除商机「${opportunity.title}」？此操作不可撤销。`))
+    if (
+      !window.confirm(`确定删除商机「${opportunity.title}」？此操作不可撤销。`)
+    )
       return
     try {
       await api(`/opportunities/${id}`, { method: 'DELETE' })
@@ -265,7 +268,7 @@ function InfoCard({
             <Select
               value={opportunity.stage}
               disabled={stageBusy}
-              onValueChange={(v) => changeStage(v as OpportunityStage)}
+              onValueChange={(v) => changeStage(v)}
             >
               <SelectTrigger size="sm" className="w-36">
                 <SelectValue />
@@ -509,7 +512,9 @@ function StatusCard({
             <Button
               variant="outline"
               disabled={busy}
-              onClick={() => run({ status: 'open', lost_reason: null }, '已重新打开')}
+              onClick={() =>
+                run({ status: 'open', lost_reason: null }, '已重新打开')
+              }
             >
               重新打开
             </Button>

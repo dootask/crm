@@ -1,10 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { badRequest, created, ok, readJson, resolveUser } from '#/lib/auth'
 import { requireCustomer } from '#/lib/guards'
-import {
-  createOpportunity,
-  listOpportunities,
-} from '#/lib/repo/opportunities'
+import { createOpportunity, listOpportunities } from '#/lib/repo/opportunities'
 import { isActiveValue } from '#/lib/repo/options'
 import type { OpportunityStage, OpportunityStatus } from '#/lib/types'
 
@@ -45,12 +42,15 @@ export const Route = createFileRoute('/api/opportunities/')({
         const user = resolveUser(request)
         const body = await readJson(request)
         if (!body) return badRequest('请求体无效')
-        const b = body as Record<string, unknown>
+        const b = body
         const customerId = Number(b.customer_id)
         const title = String(b.title ?? '').trim()
         if (!Number.isFinite(customerId)) return badRequest('缺少 customer_id')
         if (!title) return badRequest('商机标题必填')
-        if (b.stage != null && !isActiveValue('opportunity_stage', String(b.stage)))
+        if (
+          b.stage != null &&
+          !isActiveValue('opportunity_stage', String(b.stage))
+        )
           return badRequest('商机阶段无效')
         // 商机归属其客户，需有客户访问权
         const g = requireCustomer(user, customerId)
@@ -59,12 +59,13 @@ export const Route = createFileRoute('/api/opportunities/')({
           {
             customer_id: customerId,
             title,
-            stage: (b.stage as OpportunityStage) ?? 'initial',
-            status: (b.status as OpportunityStatus) ?? 'open',
+            stage: (b.stage as OpportunityStage | undefined) ?? 'initial',
+            status: (b.status as OpportunityStatus | undefined) ?? 'open',
             owner_id: b.owner_id != null ? Number(b.owner_id) : user.userId,
             amount: b.amount != null ? Number(b.amount) : null,
-            expected_close_at: (b.expected_close_at as string) ?? null,
-            next_follow_at: (b.next_follow_at as string) ?? null,
+            expected_close_at:
+              (b.expected_close_at as string | undefined) ?? null,
+            next_follow_at: (b.next_follow_at as string | undefined) ?? null,
           },
           user.userId,
         )

@@ -18,10 +18,7 @@ import { Input } from '#/components/ui/input.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { TONES, ToneBadge, ToneDot } from '#/components/ui/badge.tsx'
 import type { Tone } from '#/components/ui/badge.tsx'
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from '#/components/ui/toggle-group.tsx'
+import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group.tsx'
 import { EmptyState, Loading, PageHeader } from '#/components/ui/misc'
 import { Field } from '#/components/ui/form-field.tsx'
 import {
@@ -72,6 +69,8 @@ export function OptionManager({
     return () => {
       cancelled = true
     }
+    // 仅在 category 变化时重新加载；reload 依赖 category，无需单列。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category])
 
   // 任一变更后：刷新本页列表 + 全局选项（让徽章/下拉同步）。
@@ -239,7 +238,9 @@ export function OptionManager({
                         size="sm"
                         className="text-destructive hover:text-destructive"
                         disabled={busy || inUse}
-                        title={inUse ? '使用中，无法删除（可改为停用）' : undefined}
+                        title={
+                          inUse ? '使用中，无法删除（可改为停用）' : undefined
+                        }
                         onClick={() => del(item)}
                       >
                         <Trash2 className="size-4" />

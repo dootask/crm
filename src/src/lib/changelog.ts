@@ -17,7 +17,8 @@ async function ownerName(v: unknown, token: string | null): Promise<string> {
   const id = Number(v)
   if (!Number.isFinite(id)) return show(v)
   const map = await resolveUsers([id], token)
-  return map[id]?.nickname ?? `用户#${id}`
+  // resolveUsers 的返回类型按 key 标成非空，但实际可能解析不到该 id，故按可空处理。
+  return (map[id] as (typeof map)[number] | undefined)?.nickname ?? `用户#${id}`
 }
 
 // status（客户）/ stage（商机）的中文名取自可配置选项，运行时按 value 解析，
@@ -40,7 +41,8 @@ const OPPORTUNITY_FIELDS: Array<FieldDef> = [
     key: 'status',
     label: '状态',
     format: (v) =>
-      OPPORTUNITY_STATUS[v as keyof typeof OPPORTUNITY_STATUS] ?? show(v),
+      (OPPORTUNITY_STATUS as Record<string, string | undefined>)[String(v)] ??
+      show(v),
   },
   { key: 'owner_id', label: '负责人', format: ownerName },
   { key: 'amount', label: '金额' },
@@ -122,7 +124,10 @@ export async function logEntityChanges(opts: {
 }
 
 /** 触发任务聊天动态推送的字段白名单（噪音字段如名称/标签/备注不推）。 */
-export const NOTIFY_FIELDS: Record<'customer' | 'opportunity', ReadonlyArray<string>> = {
+export const NOTIFY_FIELDS: Record<
+  'customer' | 'opportunity',
+  ReadonlyArray<string>
+> = {
   customer: ['status', 'owner_id', 'next_follow_at'],
   opportunity: [
     'stage',

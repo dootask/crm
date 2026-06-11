@@ -33,11 +33,16 @@ import {
 } from '#/components/ui/dialog.tsx'
 import { Field } from '#/components/ui/form-field.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
-import { CustomerStatusBadge, ToneBadge, ToneDot } from '#/components/ui/badge.tsx'
+import {
+  CustomerStatusBadge,
+  ToneBadge,
+  ToneDot,
+} from '#/components/ui/badge.tsx'
 import type { Tone } from '#/components/ui/badge.tsx'
 import { PageHeader, Loading, EmptyState } from '#/components/ui/misc'
 import { Pager, DEFAULT_PAGE_SIZE } from '#/components/ui/pager.tsx'
-import { ViewToggle, type ListView } from '#/components/ui/view-toggle.tsx'
+import { ViewToggle } from '#/components/ui/view-toggle.tsx'
+import type { ListView } from '#/components/ui/view-toggle.tsx'
 import { usePersistentState } from '#/lib/use-persistent'
 
 function splitTags(tags: string | null): Array<string> {
@@ -115,7 +120,6 @@ export function CustomersView({ active }: { active: boolean }) {
   // 查询条件或页码变化时加载（含首次挂载）。
   useEffect(() => {
     reloadList()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced, status, page, pageSize])
 
   // 切回本视图时后台刷新当前页。
@@ -166,7 +170,8 @@ export function CustomersView({ active }: { active: boolean }) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">
-              全部状态 ({Object.values(statusCounts).reduce((a, b) => a + b, 0)})
+              全部状态 ({Object.values(statusCounts).reduce((a, b) => a + b, 0)}
+              )
             </SelectItem>
             {statusOptions.map((o) => (
               <SelectItem key={o.value} value={o.value}>
@@ -305,6 +310,8 @@ function CreateCustomerDialog({
     setPendingTasks([])
     setError(null)
     setSubmitting(false)
+    // 仅在对话框开关时重置；defaultStatus 取打开当下的值，不随其变化重跑。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   async function pickOwner() {
@@ -341,9 +348,15 @@ function CreateCustomerDialog({
         },
       })
       // 客户已建好，逐条补关联任务；个别失败不回滚客户，仅提示。
-      const failed = await linkPendingTasks('customer', customer.id, pendingTasks)
+      const failed = await linkPendingTasks(
+        'customer',
+        customer.id,
+        pendingTasks,
+      )
       if (failed.length)
-        messageError(`客户已创建，但 ${failed.length} 个任务关联失败：${failed[0]}`)
+        messageError(
+          `客户已创建，但 ${failed.length} 个任务关联失败：${failed[0]}`,
+        )
       onCreated()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : '创建失败')
@@ -379,10 +392,7 @@ function CreateCustomerDialog({
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="状态">
-              <Select
-                value={status}
-                onValueChange={(v) => setStatus(v as CustomerStatus)}
-              >
+              <Select value={status} onValueChange={(v) => setStatus(v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>

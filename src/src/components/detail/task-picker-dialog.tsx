@@ -180,7 +180,11 @@ function SearchPane({
             onClick={() => {
               const id = Number(manualId.trim())
               if (Number.isFinite(id) && id > 0)
-                onPick({ kind: 'existing', task_id: id, title: manualTitle.trim() })
+                onPick({
+                  kind: 'existing',
+                  task_id: id,
+                  title: manualTitle.trim(),
+                })
             }}
           >
             {busy ? '关联中…' : '关联'}
@@ -224,7 +228,11 @@ function SearchPane({
                   disabled={busy}
                   className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-accent/50 disabled:opacity-60"
                   onClick={() =>
-                    onPick({ kind: 'existing', task_id: t.task_id, title: t.name })
+                    onPick({
+                      kind: 'existing',
+                      task_id: t.task_id,
+                      title: t.name,
+                    })
                   }
                 >
                   <span className="text-sm font-medium">
@@ -327,7 +335,9 @@ function CreatePane({
           disabled={!project || project.columns.length === 0}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder={project ? '选择列表（默认第一个）' : '请先选择项目'} />
+            <SelectValue
+              placeholder={project ? '选择列表（默认第一个）' : '请先选择项目'}
+            />
           </SelectTrigger>
           <SelectContent>
             {project?.columns.map((c) => (
@@ -397,7 +407,7 @@ export async function linkTaskSelection(
     method: 'POST',
     json,
   })
-  return { warning: res?.warning }
+  return { warning: res.warning }
 }
 
 /**

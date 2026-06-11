@@ -60,10 +60,8 @@ import { OwnerInlineEdit } from '#/components/detail/owner-field.tsx'
 import { InlineDateEdit } from '#/components/detail/inline-date-field.tsx'
 import { messageError, messageSuccess } from '#/lib/message'
 import { TaskLinksSection } from '#/components/detail/task-links-section.tsx'
-import {
-  FollowUpsSection,
-  type FollowUpsHandle,
-} from '#/components/detail/follow-ups-section.tsx'
+import { FollowUpsSection } from '#/components/detail/follow-ups-section.tsx'
+import type { FollowUpsHandle } from '#/components/detail/follow-ups-section.tsx'
 
 export const Route = createFileRoute('/customers/$id')({
   component: CustomerDetailPage,
@@ -120,7 +118,9 @@ function CustomerDetailPage() {
   if (error) {
     return (
       <div>
-        <BreadcrumbBar items={[{ label: '客户', to: '/customers' }, { label: '详情' }]} />
+        <BreadcrumbBar
+          items={[{ label: '客户', to: '/customers' }, { label: '详情' }]}
+        />
         <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
@@ -131,7 +131,9 @@ function CustomerDetailPage() {
   if (!data) {
     return (
       <div>
-        <BreadcrumbBar items={[{ label: '客户', to: '/customers' }, { label: '详情' }]} />
+        <BreadcrumbBar
+          items={[{ label: '客户', to: '/customers' }, { label: '详情' }]}
+        />
         <Loading />
       </div>
     )
@@ -177,9 +179,19 @@ function CustomerDetailPage() {
         </div>
       </div>
 
-      <CustomerInfoCard id={id} customer={customer} nameOf={nameOf} onChanged={reload} />
+      <CustomerInfoCard
+        id={id}
+        customer={customer}
+        nameOf={nameOf}
+        onChanged={reload}
+      />
       <ContactsCard id={id} contacts={data.contacts} onChanged={reload} />
-      <OpportunitiesCard id={id} opportunities={data.opportunities} nameOf={nameOf} onChanged={reload} />
+      <OpportunitiesCard
+        id={id}
+        opportunities={data.opportunities}
+        nameOf={nameOf}
+        onChanged={reload}
+      />
       <TaskLinksSection
         entityType="customer"
         entityId={Number(id)}
@@ -259,7 +271,7 @@ function CustomerInfoCard({
           <Select
             value={customer.status}
             disabled={statusBusy}
-            onValueChange={(v) => changeStatus(v as CustomerStatus)}
+            onValueChange={(v) => changeStatus(v)}
           >
             <SelectTrigger size="sm" className="w-28">
               <SelectValue />
@@ -365,7 +377,9 @@ function EditCustomerDialog({
     setTags(customer.tags ?? '')
     setNote(customer.note ?? '')
     setNextFollowAt(
-      customer.next_follow_at ? customer.next_follow_at.slice(0, 10) : undefined,
+      customer.next_follow_at
+        ? customer.next_follow_at.slice(0, 10)
+        : undefined,
     )
     setError(null)
     setSubmitting(false)
@@ -751,6 +765,8 @@ function NewOpportunityDialog({
     setOwnerId(null)
     setError(null)
     setSubmitting(false)
+    // 仅在对话框开关时重置；defaultStage 取打开当下的值，不随其变化重跑。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   async function pickOwner() {
@@ -817,10 +833,7 @@ function NewOpportunityDialog({
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="阶段">
-              <Select
-                value={stage}
-                onValueChange={(v) => setStage(v as OpportunityStage)}
-              >
+              <Select value={stage} onValueChange={(v) => setStage(v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>

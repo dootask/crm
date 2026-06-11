@@ -50,8 +50,11 @@ export const Route = createFileRoute('/api/customers/$id')({
         if (g.deny) return g.deny
         const body = await readJson(request)
         if (!body) return badRequest('请求体无效')
-        const b = body as Record<string, unknown>
-        if (b.status != null && !isActiveValue('customer_status', String(b.status)))
+        const b = body
+        if (
+          b.status != null &&
+          !isActiveValue('customer_status', String(b.status))
+        )
           return badRequest('客户状态无效')
         const before = g.customer
         const updated = updateCustomer(id, {

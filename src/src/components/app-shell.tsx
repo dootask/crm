@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function UserAvatar({ user }: { user: DooTaskUser | null }) {
   const img =
-    typeof (user as { userimg?: unknown })?.userimg === 'string'
+    typeof (user as { userimg?: unknown } | null)?.userimg === 'string'
       ? ((user as { userimg?: string }).userimg as string)
       : undefined
   const nickname = user?.nickname || (user ? `用户#${user.userid}` : '')

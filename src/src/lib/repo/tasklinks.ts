@@ -36,7 +36,7 @@ export function createTaskLink(input: {
       })
     return getDb()
       .prepare('SELECT * FROM task_links WHERE id = ?')
-      .get(info.lastInsertRowid as number) as TaskLink
+      .get(info.lastInsertRowid) as TaskLink
   } catch {
     // UNIQUE 冲突：已关联，返回已有记录
     return getDb()
@@ -50,5 +50,7 @@ export function createTaskLink(input: {
 }
 
 export function deleteTaskLink(id: number): boolean {
-  return getDb().prepare('DELETE FROM task_links WHERE id = ?').run(id).changes > 0
+  return (
+    getDb().prepare('DELETE FROM task_links WHERE id = ?').run(id).changes > 0
+  )
 }

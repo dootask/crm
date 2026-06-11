@@ -41,23 +41,25 @@ export const Route = createFileRoute('/api/customers/')({
         const user = resolveUser(request)
         const body = await readJson(request)
         if (!body) return badRequest('请求体无效')
-        const b = body as Record<string, unknown>
+        const b = body
         const name = String(b.name ?? '').trim()
         if (!name) return badRequest('客户名称必填')
-        if (b.status != null && !isActiveValue('customer_status', String(b.status)))
+        if (
+          b.status != null &&
+          !isActiveValue('customer_status', String(b.status))
+        )
           return badRequest('客户状态无效')
         const customer = createCustomer(
           {
             name,
-            company: (b.company as string) ?? null,
-            status: (b.status as CustomerStatus) ?? 'lead',
-            source: (b.source as string) ?? null,
-            tags: (b.tags as string) ?? null,
-            note: (b.note as string) ?? null,
+            company: (b.company as string | undefined) ?? null,
+            status: (b.status as CustomerStatus | undefined) ?? 'lead',
+            source: (b.source as string | undefined) ?? null,
+            tags: (b.tags as string | undefined) ?? null,
+            note: (b.note as string | undefined) ?? null,
             // 负责人默认当前用户，可由前端指定其他 DooTask 用户
-            owner_id:
-              b.owner_id != null ? Number(b.owner_id) : user.userId,
-            next_follow_at: (b.next_follow_at as string) ?? null,
+            owner_id: b.owner_id != null ? Number(b.owner_id) : user.userId,
+            next_follow_at: (b.next_follow_at as string | undefined) ?? null,
           },
           user.userId,
         )

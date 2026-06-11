@@ -20,7 +20,8 @@ import { PendingTaskLinks } from '#/components/detail/pending-task-links.tsx'
 import { useActivate } from '#/components/keep-alive'
 import { PageHeader, Loading, EmptyState } from '#/components/ui/misc'
 import { Pager, DEFAULT_PAGE_SIZE } from '#/components/ui/pager.tsx'
-import { ViewToggle, type ListView } from '#/components/ui/view-toggle.tsx'
+import { ViewToggle } from '#/components/ui/view-toggle.tsx'
+import type { ListView } from '#/components/ui/view-toggle.tsx'
 import { usePersistentState } from '#/lib/use-persistent'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
@@ -115,7 +116,6 @@ export function OpportunitiesView({ active }: { active: boolean }) {
   // 客户列表只需拉一次
   useEffect(() => {
     loadCustomers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 切回本视图时后台刷新
@@ -168,10 +168,7 @@ export function OpportunitiesView({ active }: { active: boolean }) {
           className="w-full sm:max-w-xs"
         />
 
-        <Select
-          value={stage}
-          onValueChange={(v) => changeStage(v as typeof stage)}
-        >
+        <Select value={stage} onValueChange={(v) => changeStage(v)}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="阶段" />
           </SelectTrigger>
@@ -322,6 +319,8 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
     api<{ items: Array<Customer>; total: number }>('/customers')
       .then((res) => setCustomers(res.items))
       .catch(() => setCustomers([]))
+    // 仅在对话框开关时重置；defaultStage 取打开当下的值，不随其变化重跑。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   async function pickOwner() {
@@ -368,7 +367,9 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
       })
       const failed = await linkPendingTasks('opportunity', opp.id, pendingTasks)
       if (failed.length)
-        messageError(`商机已创建，但 ${failed.length} 个任务关联失败：${failed[0]}`)
+        messageError(
+          `商机已创建，但 ${failed.length} 个任务关联失败：${failed[0]}`,
+        )
       setOpen(false)
       onCreated()
     } catch (e) {
@@ -416,10 +417,7 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="阶段">
-              <Select
-                value={stage}
-                onValueChange={(v) => setStage(v as OpportunityStage)}
-              >
+              <Select value={stage} onValueChange={(v) => setStage(v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>

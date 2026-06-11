@@ -59,6 +59,7 @@
     "@types/sanitize-html": "^2.16.1",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.20.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^28.1.0",
     "prettier": "^3.8.1",
     "typescript": "^6.0.2",

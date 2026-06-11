@@ -33,7 +33,7 @@ export const Route = createFileRoute('/api/follow-ups/')({
         const user = resolveUser(request)
         const body = await readJson(request)
         if (!body) return badRequest('请求体无效')
-        const b = body as Record<string, unknown>
+        const b = body
         const customerId = Number(b.customer_id)
         if (!Number.isFinite(customerId)) return badRequest('缺少 customer_id')
 
@@ -52,14 +52,15 @@ export const Route = createFileRoute('/api/follow-ups/')({
 
         const g = requireCustomer(user, customerId)
         if (g.deny) return g.deny
-        const opportunityId = b.opportunity_id != null ? Number(b.opportunity_id) : null
+        const opportunityId =
+          b.opportunity_id != null ? Number(b.opportunity_id) : null
         const follow = createFollowUp({
           customer_id: customerId,
           opportunity_id: opportunityId,
           content,
           attachments,
           follow_by: user.userId,
-          next_follow_at: (b.next_follow_at as string) ?? null,
+          next_follow_at: (b.next_follow_at as string | undefined) ?? null,
         })
 
         // 推送「新增跟进」到关联任务聊天（客户必推；归属商机时也推到商机的关联任务）。
@@ -74,7 +75,8 @@ export const Route = createFileRoute('/api/follow-ups/')({
           : ''
         const text = `📝 新增跟进：${summary}${nextLine}`
         void notifyTaskLinks('customer', customerId, text)
-        if (opportunityId) void notifyTaskLinks('opportunity', opportunityId, text)
+        if (opportunityId)
+          void notifyTaskLinks('opportunity', opportunityId, text)
 
         return created(follow)
       },

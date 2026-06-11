@@ -16,19 +16,21 @@ export function createTaskLink(input: {
   entity_type: EntityType
   entity_id: number
   task_id: number
+  dialog_id?: number | null
   title?: string | null
   created_by: number
 }): TaskLink | undefined {
   try {
     const info = getDb()
       .prepare(
-        `INSERT INTO task_links (entity_type, entity_id, task_id, title, created_by)
-         VALUES (@entity_type, @entity_id, @task_id, @title, @created_by)`,
+        `INSERT INTO task_links (entity_type, entity_id, task_id, dialog_id, title, created_by)
+         VALUES (@entity_type, @entity_id, @task_id, @dialog_id, @title, @created_by)`,
       )
       .run({
         entity_type: input.entity_type,
         entity_id: input.entity_id,
         task_id: input.task_id,
+        dialog_id: input.dialog_id ?? null,
         title: input.title ?? null,
         created_by: input.created_by,
       })

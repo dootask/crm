@@ -7,6 +7,10 @@ import { useCustomerStatusOptions } from '#/lib/use-options'
 import { formatDate, isOverdue, plainExcerpt } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { pickUsers } from '#/lib/dootask'
+import { messageError } from '#/lib/message'
+import { linkPendingTasks } from '#/components/detail/task-picker-dialog.tsx'
+import type { TaskSelection } from '#/components/detail/task-picker-dialog.tsx'
+import { PendingTaskLinks } from '#/components/detail/pending-task-links.tsx'
 import { useActivate } from '#/components/keep-alive'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
@@ -282,6 +286,7 @@ function CreateCustomerDialog({
   const [nextFollowAt, setNextFollowAt] = useState<string | undefined>(
     undefined,
   )
+  const [pendingTasks, setPendingTasks] = useState<Array<TaskSelection>>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -297,6 +302,7 @@ function CreateCustomerDialog({
     setNote('')
     setOwnerId(null)
     setNextFollowAt(undefined)
+    setPendingTasks([])
     setError(null)
     setSubmitting(false)
   }, [open])
@@ -320,7 +326,7 @@ function CreateCustomerDialog({
     setSubmitting(true)
     setError(null)
     try {
-      await api<Customer>('/customers', {
+      const customer = await api<Customer>('/customers', {
         method: 'POST',
         json: {
           name: name.trim(),
@@ -334,6 +340,10 @@ function CreateCustomerDialog({
           next_follow_at: nextFollowAt || undefined,
         },
       })
+      // 客户已建好，逐条补关联任务；个别失败不回滚客户，仅提示。
+      const failed = await linkPendingTasks('customer', customer.id, pendingTasks)
+      if (failed.length)
+        messageError(`客户已创建，但 ${failed.length} 个任务关联失败：${failed[0]}`)
       onCreated()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : '创建失败')
@@ -441,6 +451,13 @@ function CreateCustomerDialog({
           </Field>
           <Field label="备注">
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} />
+          </Field>
+          <Field label="关联任务（可选）">
+            <PendingTaskLinks
+              value={pendingTasks}
+              onChange={setPendingTasks}
+              defaultName={name.trim() || undefined}
+            />
           </Field>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>

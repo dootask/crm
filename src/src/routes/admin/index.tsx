@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ChevronRight, Database, Target, Users } from 'lucide-react'
+import { Bell, ChevronRight, Database, Target, Users } from 'lucide-react'
 import { AdminGate } from '#/components/admin/admin-gate.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import { PageHeader } from '#/components/ui/misc'
@@ -25,6 +25,12 @@ const ENTRIES = [
     icon: Target,
     title: '商机阶段',
     desc: '维护商机阶段选项（名称 / 颜色 / 排序 / 停用）',
+  },
+  {
+    to: '/admin/settings',
+    icon: Bell,
+    title: '动态推送',
+    desc: '配置 CRM 机器人，把变更与到期提醒推送到关联任务',
   },
 ] as const
 

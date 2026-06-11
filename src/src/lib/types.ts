@@ -122,6 +122,8 @@ export interface TaskLink {
   entity_type: EntityType
   entity_id: number
   task_id: number
+  /** 任务聊天对话 id，关联时解析并缓存，动态推送据此发送；旧记录可能为 null。 */
+  dialog_id: number | null
   title: string | null
   created_by: number
   created_at: string

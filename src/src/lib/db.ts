@@ -122,10 +122,18 @@ function migrate(db: Database.Database) {
       entity_type TEXT NOT NULL,
       entity_id   INTEGER NOT NULL,
       task_id     INTEGER NOT NULL,
+      dialog_id   INTEGER,
       title       TEXT,
       created_by  INTEGER NOT NULL,
       created_at  TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(entity_type, entity_id, task_id)
+    );
+
+    -- key-value 系统设置：存机器人 token / userid 等凭据与开关（仅管理员可写）。
+    CREATE TABLE IF NOT EXISTS sys_settings (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_customers_owner       ON customers(owner_id);
@@ -143,6 +151,8 @@ function migrate(db: Database.Database) {
 
   // 旧库补列：follow_ups.attachments（跟进附件 JSON）。CREATE 已含该列，仅为升级路径。
   addColumnIfMissing(db, 'follow_ups', 'attachments', 'TEXT')
+  // 旧库补列：task_links.dialog_id（关联任务的聊天对话 id，用于回流动态）。
+  addColumnIfMissing(db, 'task_links', 'dialog_id', 'INTEGER')
 }
 
 /** 若表缺少某列则追加（幂等，用于已存在的数据库升级）。 */

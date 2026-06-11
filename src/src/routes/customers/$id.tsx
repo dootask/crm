@@ -183,6 +183,7 @@ function CustomerDetailPage() {
       <TaskLinksSection
         entityType="customer"
         entityId={Number(id)}
+        entityName={customer.name}
         taskLinks={data.task_links}
         onChanged={reload}
       />

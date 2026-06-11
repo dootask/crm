@@ -208,6 +208,43 @@ export async function previewImage(
   }
 }
 
+export interface DooTaskTaskHit {
+  task_id: number
+  name: string
+  project_name?: string
+}
+
+/**
+ * 搜索当前用户可见/参与的任务（主程序 api/search/task，已按权限过滤）。
+ * - 返回命中列表（最多 ~20 条）。
+ * - 独立模式（非微前端）返回 null，调用方据此降级为手动输入任务 ID。
+ */
+export async function searchDooTaskTasks(
+  key: string,
+): Promise<Array<DooTaskTaskHit> | null> {
+  try {
+    const tools = await import('@dootask/tools')
+    if (!(await tools.isMicroApp())) return null
+    const res = await tools.requestAPI({
+      url: 'search/task',
+      method: 'get',
+      data: { key, take: 20 },
+    })
+    const data: unknown = res.data
+    const rows: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
+    return rows
+      .map((r) => ({
+        task_id: Number(r.task_id ?? r.id),
+        name: String(r.name ?? ''),
+        project_name:
+          typeof r.project_name === 'string' ? r.project_name : undefined,
+      }))
+      .filter((t) => Number.isFinite(t.task_id) && t.task_id > 0)
+  } catch {
+    return []
+  }
+}
+
 /** 在 DooTask 中打开指定任务。独立模式下静默失败。 */
 export async function openDooTaskTask(taskId: number): Promise<void> {
   try {

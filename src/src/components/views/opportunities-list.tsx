@@ -13,6 +13,10 @@ import { useOpportunityStageOptions } from '#/lib/use-options'
 import { formatDate, formatMoney, isOverdue, plainExcerpt } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { pickUsers } from '#/lib/dootask'
+import { messageError } from '#/lib/message'
+import { linkPendingTasks } from '#/components/detail/task-picker-dialog.tsx'
+import type { TaskSelection } from '#/components/detail/task-picker-dialog.tsx'
+import { PendingTaskLinks } from '#/components/detail/pending-task-links.tsx'
 import { useActivate } from '#/components/keep-alive'
 import { PageHeader, Loading, EmptyState } from '#/components/ui/misc'
 import { Pager, DEFAULT_PAGE_SIZE } from '#/components/ui/pager.tsx'
@@ -297,6 +301,7 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
     undefined,
   )
   const [ownerId, setOwnerId] = useState<number | null>(null)
+  const [pendingTasks, setPendingTasks] = useState<Array<TaskSelection>>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -311,6 +316,7 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
     setExpectedCloseAt(undefined)
     setNextFollowAt(undefined)
     setOwnerId(null)
+    setPendingTasks([])
     setError(null)
     setBusy(false)
     api<{ items: Array<Customer>; total: number }>('/customers')
@@ -348,7 +354,7 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
     setBusy(true)
     setError(null)
     try {
-      await api<Opportunity>('/opportunities', {
+      const opp = await api<Opportunity>('/opportunities', {
         method: 'POST',
         json: {
           customer_id: Number(customerId),
@@ -360,6 +366,9 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
           owner_id: ownerId ?? undefined,
         },
       })
+      const failed = await linkPendingTasks('opportunity', opp.id, pendingTasks)
+      if (failed.length)
+        messageError(`商机已创建，但 ${failed.length} 个任务关联失败：${failed[0]}`)
       setOpen(false)
       onCreated()
     } catch (e) {
@@ -475,6 +484,14 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
                 </Button>
               )}
             </div>
+          </Field>
+
+          <Field label="关联任务（可选）">
+            <PendingTaskLinks
+              value={pendingTasks}
+              onChange={setPendingTasks}
+              defaultName={title.trim() || undefined}
+            />
           </Field>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

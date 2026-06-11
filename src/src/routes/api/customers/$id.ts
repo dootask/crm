@@ -3,7 +3,8 @@ import { badRequest, ok, readJson, resolveUser } from '#/lib/auth'
 import { requireCustomer } from '#/lib/guards'
 import { deleteCustomer, updateCustomer } from '#/lib/repo/customers'
 import { isActiveValue } from '#/lib/repo/options'
-import { logEntityChanges } from '#/lib/changelog'
+import { logEntityChanges, shouldNotify } from '#/lib/changelog'
+import { notifyTaskLinks } from '#/lib/notify'
 import { listContacts } from '#/lib/repo/contacts'
 import { listFollowUps } from '#/lib/repo/followups'
 import { listOpportunities } from '#/lib/repo/opportunities'
@@ -63,9 +64,9 @@ export const Route = createFileRoute('/api/customers/$id')({
           owner_id: b.owner_id != null ? Number(b.owner_id) : undefined,
           next_follow_at: b.next_follow_at as string | undefined,
         })
-        // 自动记录本次修改为一条跟进
+        // 自动记录本次修改为一条跟进；命中白名单字段时推送到关联任务聊天。
         if (updated) {
-          await logEntityChanges({
+          const change = await logEntityChanges({
             entity: 'customer',
             customerId: id,
             before: before as unknown as Record<string, unknown>,
@@ -73,6 +74,9 @@ export const Route = createFileRoute('/api/customers/$id')({
             userId: user.userId,
             token: request.headers.get('x-user-token'),
           })
+          if (change && shouldNotify('customer', change.changed)) {
+            void notifyTaskLinks('customer', id, `✏️ ${change.content}`)
+          }
         }
         return ok(updated)
       },

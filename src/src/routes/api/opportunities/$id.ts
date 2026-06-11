@@ -5,7 +5,8 @@ import {
   deleteOpportunity,
   updateOpportunity,
 } from '#/lib/repo/opportunities'
-import { logEntityChanges } from '#/lib/changelog'
+import { logEntityChanges, shouldNotify } from '#/lib/changelog'
+import { notifyTaskLinks } from '#/lib/notify'
 import { getCustomer } from '#/lib/repo/customers'
 import { isActiveValue } from '#/lib/repo/options'
 import { listFollowUps } from '#/lib/repo/followups'
@@ -66,7 +67,7 @@ export const Route = createFileRoute('/api/opportunities/$id')({
           next_follow_at: b.next_follow_at as string | undefined,
         })
         if (updated) {
-          await logEntityChanges({
+          const change = await logEntityChanges({
             entity: 'opportunity',
             customerId: before.customer_id,
             opportunityId: before.id,
@@ -75,6 +76,9 @@ export const Route = createFileRoute('/api/opportunities/$id')({
             userId: user.userId,
             token: request.headers.get('x-user-token'),
           })
+          if (change && shouldNotify('opportunity', change.changed)) {
+            void notifyTaskLinks('opportunity', before.id, `✏️ ${change.content}`)
+          }
         }
         return ok(updated)
       },

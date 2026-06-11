@@ -187,6 +187,7 @@ function OpportunityDetailPage() {
       <TaskLinksSection
         entityType="opportunity"
         entityId={Number(id)}
+        entityName={opportunity.title}
         taskLinks={data.task_links}
         onChanged={reload}
       />

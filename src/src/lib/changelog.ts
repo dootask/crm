@@ -49,9 +49,15 @@ const OPPORTUNITY_FIELDS: Array<FieldDef> = [
   { key: 'next_follow_at', label: '下次跟进时间', format: (v) => show(v) },
 ]
 
+/** 修改记录写入结果：含本次变更的字段 key 与生成的记录正文。无变化则为 null。 */
+export interface ChangeLogResult {
+  changed: Array<string>
+  content: string
+}
+
 /**
  * 对比 before/after，把发生变化的字段拼成一条「修改」跟进记录写入。
- * 无实际变化则不写。返回是否写入。
+ * 无实际变化则不写。返回变更字段与正文（供动态推送按白名单决策），无变化返回 null。
  */
 export async function logEntityChanges(opts: {
   entity: 'customer' | 'opportunity'
@@ -61,7 +67,7 @@ export async function logEntityChanges(opts: {
   after: Record<string, unknown>
   userId: number
   token: string | null
-}): Promise<boolean> {
+}): Promise<ChangeLogResult | null> {
   const fields =
     opts.entity === 'customer' ? CUSTOMER_FIELDS : OPPORTUNITY_FIELDS
   // 该实体里「可配置选项」字段的 key 及其 value→label 映射。
@@ -70,6 +76,7 @@ export async function logEntityChanges(opts: {
     opts.entity === 'customer' ? 'customer_status' : 'opportunity_stage',
   )
   const parts: Array<string> = []
+  const changed: Array<string> = []
   // 若本次改了下次跟进时间，这条变更记录自身也带上新值，
   // 让时间线里显示 `下次:` 徽章（与表单添加的记录一致）；清空则为 NULL。
   let nextFollowAt: string | null = null
@@ -90,11 +97,12 @@ export async function logEntityChanges(opts: {
       as = await fmt(a, opts.token)
     }
     parts.push(`${f.label}：${bs} → ${as}`)
+    changed.push(f.key)
     if (f.key === 'next_follow_at') {
       nextFollowAt = empty(a) ? null : String(a).slice(0, 10)
     }
   }
-  if (parts.length === 0) return false
+  if (parts.length === 0) return null
 
   const label = opts.entity === 'customer' ? '修改客户信息' : '修改商机信息'
   const content = `【${label}】${parts.join('；')}`
@@ -110,5 +118,27 @@ export async function logEntityChanges(opts: {
       opts.userId,
       nextFollowAt,
     )
-  return true
+  return { changed, content }
+}
+
+/** 触发任务聊天动态推送的字段白名单（噪音字段如名称/标签/备注不推）。 */
+export const NOTIFY_FIELDS: Record<'customer' | 'opportunity', ReadonlyArray<string>> = {
+  customer: ['status', 'owner_id', 'next_follow_at'],
+  opportunity: [
+    'stage',
+    'status',
+    'owner_id',
+    'amount',
+    'expected_close_at',
+    'next_follow_at',
+  ],
+}
+
+/** 本次变更是否命中白名单（决定要不要推送到任务聊天）。 */
+export function shouldNotify(
+  entity: 'customer' | 'opportunity',
+  changed: Array<string>,
+): boolean {
+  const allow = NOTIFY_FIELDS[entity]
+  return changed.some((k) => allow.includes(k))
 }

@@ -29,7 +29,7 @@ function BackupPage() {
   return (
     <div>
       <BreadcrumbBar
-        items={[{ label: '管理', to: '/admin' }, { label: '数据库备份' }]}
+        items={[{ label: '管理', to: '/admin' }, { label: '数据备份' }]}
       />
       <AdminGate>
         <BackupManager />
@@ -84,9 +84,12 @@ function BackupManager() {
   }
 
   async function handleRestore(name: string) {
+    const isZip = name.endsWith('.zip')
     const okGo = await confirmDialog({
-      title: '还原数据库',
-      content: `将用「${name}」覆盖当前数据库，现有数据会被替换且不可恢复，确定继续？`,
+      title: '还原备份',
+      content: isZip
+        ? `将用「${name}」覆盖当前数据库与上传附件，现有数据会被替换，确定继续？（被替换的附件目录会另存为 uploads.bak-* 保留）`
+        : `将用「${name}」覆盖当前数据库（旧版备份不含附件），现有数据会被替换且不可恢复，确定继续？`,
       okText: '还原',
       cancelText: '取消',
     })
@@ -127,8 +130,8 @@ function BackupManager() {
   return (
     <div>
       <PageHeader
-        title="数据库备份"
-        description="备份、还原与下载 CRM 数据库"
+        title="数据备份"
+        description="备份、还原与下载 CRM 数据库与上传附件"
         action={
           <Button onClick={handleBackup} disabled={working === 'backup'}>
             <HardDriveDownload className="size-4" />

@@ -21,9 +21,12 @@ export const Route = createFileRoute('/api/admin/backups/$name')({
         const full = resolveBackupPath(params.name)
         if (!full) return notFound('备份不存在')
         const buf = readFileSync(full)
+        const type = params.name.endsWith('.zip')
+          ? 'application/zip'
+          : 'application/octet-stream'
         return new Response(new Uint8Array(buf), {
           headers: {
-            'content-type': 'application/octet-stream',
+            'content-type': type,
             'content-disposition': `attachment; filename="${params.name}"`,
             'content-length': String(buf.length),
           },

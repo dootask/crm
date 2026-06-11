@@ -11,8 +11,8 @@ const ENTRIES = [
   {
     to: '/admin/backup',
     icon: Database,
-    title: '数据库备份',
-    desc: '备份、还原与下载 CRM 数据库',
+    title: '数据备份',
+    desc: '备份、还原与下载 CRM 数据库与上传附件',
   },
   {
     to: '/admin/customer-status',

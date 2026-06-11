@@ -174,6 +174,40 @@ export async function confirmDialog(opts: {
   }
 }
 
+export interface PreviewImageItem {
+  src: string
+  width?: number
+  height?: number
+}
+
+/**
+ * 调用主程序的图片预览（@dootask/tools.callExtraStore('previewImage')）。
+ * list 为同一组图片，index 为点击项下标。独立模式回退到新窗口打开当前图。
+ */
+export async function previewImage(
+  list: Array<PreviewImageItem>,
+  index = 0,
+): Promise<void> {
+  if (list.length === 0) return
+  const openFallback = () => {
+    try {
+      window.open(list[index]?.src ?? list[0].src, '_blank')
+    } catch {
+      /* 忽略 */
+    }
+  }
+  try {
+    const tools = await import('@dootask/tools')
+    if (!(await tools.isMicroApp())) {
+      openFallback()
+      return
+    }
+    await tools.callExtraStore('previewImage', { index, list })
+  } catch {
+    openFallback()
+  }
+}
+
 /** 在 DooTask 中打开指定任务。独立模式下静默失败。 */
 export async function openDooTaskTask(taskId: number): Promise<void> {
   try {

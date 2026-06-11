@@ -7,14 +7,23 @@ import {
 } from 'react'
 import { Send } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card.tsx'
-import { Textarea } from '#/components/ui/textarea.tsx'
+import { RichTextEditor } from '#/components/ui/rich-text-editor.tsx'
+import type { RichTextEditorHandle } from '#/components/ui/rich-text-editor.tsx'
+import { RichTextContent } from '#/components/ui/rich-text-content.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { DatePicker } from '#/components/ui/date-picker.tsx'
 import { ToneBadge } from '#/components/ui/badge.tsx'
 import { Pager } from '#/components/ui/pager.tsx'
 import { api, ApiError } from '#/lib/api'
 import { formatDate, formatDateTime, isOverdue } from '#/lib/format'
-import type { FollowUp } from '#/lib/types'
+import type { Attachment, FollowUp } from '#/lib/types'
+
+/** 正文是否有可提交内容：有文字、含图片、或带附件。 */
+function hasSubmittable(html: string, attachments: Array<Attachment>): boolean {
+  if (attachments.length > 0) return true
+  if (/<img\b/i.test(html)) return true
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().length > 0
+}
 
 export interface FollowUpsHandle {
   focusAdd: () => void
@@ -41,11 +50,12 @@ export const FollowUpsSection = forwardRef<
   ref,
 ) {
   const [content, setContent] = useState('')
+  const [attachments, setAttachments] = useState<Array<Attachment>>([])
   const [nextAt, setNextAt] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const taRef = useRef<HTMLTextAreaElement>(null)
+  const editorRef = useRef<RichTextEditorHandle>(null)
 
   // 切换到另一条客户/商机时回到第一页。
   useEffect(() => {
@@ -58,18 +68,14 @@ export const FollowUpsSection = forwardRef<
 
   useImperativeHandle(ref, () => ({
     focusAdd() {
-      const el = taRef.current
-      if (!el) return
-      // 只滚动插件自身的内层 window，避免 scrollIntoView 让 iframe 外层父页面一起位移；
-      // focus 用 preventScroll 防止聚焦时再次触发（并冒泡到父框架的）滚动。
-      const top = el.getBoundingClientRect().top + window.scrollY - 16
-      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
-      el.focus({ preventScroll: true })
+      editorRef.current?.focus()
     },
   }))
 
+  const canSubmit = hasSubmittable(content, attachments) && !busy
+
   async function submit() {
-    if (!content.trim() || busy) return
+    if (!canSubmit) return
     setBusy(true)
     setError(null)
     try {
@@ -78,11 +84,14 @@ export const FollowUpsSection = forwardRef<
         json: {
           customer_id: customerId,
           opportunity_id: opportunityId,
-          content: content.trim(),
+          content,
+          attachments,
           next_follow_at: nextAt,
         },
       })
       setContent('')
+      setAttachments([])
+      editorRef.current?.clear()
       setNextAt(undefined)
       setPage(1)
       onChanged()
@@ -101,12 +110,13 @@ export const FollowUpsSection = forwardRef<
       <CardContent className="space-y-5">
         {/* 顶部内联添加表单（最新记录在上，表单也放最上） */}
         <div className="space-y-2 border-b pb-4">
-          <Textarea
-            ref={taRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
+          <RichTextEditor
+            ref={editorRef}
+            onContentChange={setContent}
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
             placeholder="记录本次沟通内容…"
-            className="min-h-20"
+            disabled={busy}
           />
           <div className="flex flex-wrap items-center gap-2">
             <div className="w-44">
@@ -116,7 +126,7 @@ export const FollowUpsSection = forwardRef<
                 placeholder="下次跟进时间"
               />
             </div>
-            <Button onClick={submit} disabled={busy || !content.trim()}>
+            <Button onClick={submit} disabled={!canSubmit}>
               <Send className="size-4" />
               {busy ? '提交中…' : '添加跟进'}
             </Button>
@@ -142,7 +152,11 @@ export const FollowUpsSection = forwardRef<
                     </ToneBadge>
                   )}
                 </div>
-                <p className="mt-1 text-sm whitespace-pre-wrap">{f.content}</p>
+                <RichTextContent
+                  className="mt-1"
+                  content={f.content}
+                  attachments={f.attachments}
+                />
               </li>
             ))}
           </ol>

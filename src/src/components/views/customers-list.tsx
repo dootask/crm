@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
 import type { Customer, CustomerStatus } from '#/lib/types'
 import { useCustomerStatusOptions } from '#/lib/use-options'
-import { formatDate, isOverdue } from '#/lib/format'
+import { formatDate, isOverdue, plainExcerpt } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { pickUsers } from '#/lib/dootask'
 import { useActivate } from '#/components/keep-alive'
@@ -237,7 +237,7 @@ export function CustomersView({ active }: { active: boolean }) {
                         {view === 'detailed' && (
                           <span className="w-full truncate text-xs text-muted-foreground">
                             {c.last_follow_content
-                              ? `最近跟进：${c.last_follow_content}（${formatDate(c.last_follow_at ?? null)}）`
+                              ? `最近跟进：${plainExcerpt(c.last_follow_content)}（${formatDate(c.last_follow_at ?? null)}）`
                               : '最近跟进：暂无'}
                           </span>
                         )}

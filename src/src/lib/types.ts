@@ -77,11 +77,22 @@ export interface Contact {
   updated_at: string
 }
 
+/** 跟进记录附件（非图片文件）。图片内联在 content 的 HTML 里，附件单独成列表。 */
+export interface Attachment {
+  name: string // 原始文件名，用于展示与下载
+  url: string // 形如 /apps/crm/api/uploads/<存储名>
+  size: number // 字节
+  mime: string // MIME 类型
+}
+
 export interface FollowUp {
   id: number
   customer_id: number
   opportunity_id: number | null
+  // 跟进正文。新记录为 Tiptap 输出的 HTML（已服务端消毒）；旧记录/自动变更记录为纯文本。
+  // 渲染端按「是否以 < 开头」区分（见 rich-text-content.tsx）。
   content: string
+  attachments: Array<Attachment> // 解析自 DB 的 attachments JSON 列，空时为 []
   follow_by: number
   next_follow_at: string | null
   created_at: string

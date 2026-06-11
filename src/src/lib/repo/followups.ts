@@ -1,13 +1,31 @@
 import { getDb } from '#/lib/db'
-import type { FollowUp } from '#/lib/types'
+import type { Attachment, FollowUp } from '#/lib/types'
 import { touchCustomerFollow } from '#/lib/repo/customers'
 
 export interface FollowUpInput {
   customer_id: number
   opportunity_id?: number | null
   content: string
+  attachments?: Array<Attachment> | null
   follow_by: number
   next_follow_at?: string | null
+}
+
+// DB 行：attachments 是 JSON 字符串或 NULL，对外统一解析为数组。
+type FollowUpRow = Omit<FollowUp, 'attachments'> & { attachments: string | null }
+
+/** 把数据库行解析成对外的 FollowUp（attachments JSON → 数组，损坏时退回 []）。 */
+function mapRow(row: FollowUpRow): FollowUp {
+  let attachments: Array<Attachment> = []
+  if (row.attachments) {
+    try {
+      const parsed = JSON.parse(row.attachments)
+      if (Array.isArray(parsed)) attachments = parsed
+    } catch {
+      /* 损坏的 JSON 忽略，按无附件处理 */
+    }
+  }
+  return { ...row, attachments }
 }
 
 export function listFollowUps(filter: {
@@ -25,9 +43,10 @@ export function listFollowUps(filter: {
     params.push(filter.opportunity_id)
   }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
-  return getDb()
+  const rows = getDb()
     .prepare(`SELECT * FROM follow_ups ${clause} ORDER BY created_at DESC, id DESC`)
-    .all(...params) as Array<FollowUp>
+    .all(...params) as Array<FollowUpRow>
+  return rows.map(mapRow)
 }
 
 /**
@@ -37,15 +56,20 @@ export function listFollowUps(filter: {
 export function createFollowUp(input: FollowUpInput): FollowUp {
   const db = getDb()
   const tx = db.transaction(() => {
+    const attachments =
+      input.attachments && input.attachments.length
+        ? JSON.stringify(input.attachments)
+        : null
     const info = db
       .prepare(
-        `INSERT INTO follow_ups (customer_id, opportunity_id, content, follow_by, next_follow_at)
-         VALUES (@customer_id, @opportunity_id, @content, @follow_by, @next_follow_at)`,
+        `INSERT INTO follow_ups (customer_id, opportunity_id, content, attachments, follow_by, next_follow_at)
+         VALUES (@customer_id, @opportunity_id, @content, @attachments, @follow_by, @next_follow_at)`,
       )
       .run({
         customer_id: input.customer_id,
         opportunity_id: input.opportunity_id ?? null,
         content: input.content,
+        attachments,
         follow_by: input.follow_by,
         next_follow_at: input.next_follow_at ?? null,
       })
@@ -60,7 +84,9 @@ export function createFollowUp(input: FollowUpInput): FollowUp {
     return info.lastInsertRowid as number
   })
   const id = tx()
-  return getDb().prepare('SELECT * FROM follow_ups WHERE id = ?').get(id) as FollowUp
+  return mapRow(
+    getDb().prepare('SELECT * FROM follow_ups WHERE id = ?').get(id) as FollowUpRow,
+  )
 }
 
 export function deleteFollowUp(id: number): boolean {
@@ -68,7 +94,8 @@ export function deleteFollowUp(id: number): boolean {
 }
 
 export function getFollowUp(id: number): FollowUp | undefined {
-  return getDb().prepare('SELECT * FROM follow_ups WHERE id = ?').get(id) as
-    | FollowUp
+  const row = getDb().prepare('SELECT * FROM follow_ups WHERE id = ?').get(id) as
+    | FollowUpRow
     | undefined
+  return row ? mapRow(row) : undefined
 }

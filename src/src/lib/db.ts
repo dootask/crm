@@ -99,6 +99,7 @@ function migrate(db: Database.Database) {
       customer_id    INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       opportunity_id INTEGER REFERENCES opportunities(id) ON DELETE SET NULL,
       content        TEXT NOT NULL,
+      attachments    TEXT,
       follow_by      INTEGER NOT NULL,
       next_follow_at TEXT,
       created_at     TEXT NOT NULL DEFAULT (datetime('now'))
@@ -139,6 +140,24 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_tasklinks_entity      ON task_links(entity_type, entity_id);
     CREATE INDEX IF NOT EXISTS idx_option_items_cat      ON option_items(category, sort_order);
   `)
+
+  // 旧库补列：follow_ups.attachments（跟进附件 JSON）。CREATE 已含该列，仅为升级路径。
+  addColumnIfMissing(db, 'follow_ups', 'attachments', 'TEXT')
+}
+
+/** 若表缺少某列则追加（幂等，用于已存在的数据库升级）。 */
+function addColumnIfMissing(
+  db: Database.Database,
+  table: string,
+  column: string,
+  type: string,
+) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+    name: string
+  }>
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
+  }
 }
 
 // 可配置选项的内置默认项：与 lib/types.ts 常量、badge.tsx 的 tone 映射保持一致。

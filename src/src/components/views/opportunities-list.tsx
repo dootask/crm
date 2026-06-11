@@ -10,7 +10,7 @@ import type {
   OpportunityStatus,
 } from '#/lib/types'
 import { useOpportunityStageOptions } from '#/lib/use-options'
-import { formatDate, formatMoney, isOverdue } from '#/lib/format'
+import { formatDate, formatMoney, isOverdue, plainExcerpt } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { pickUsers } from '#/lib/dootask'
 import { useActivate } from '#/components/keep-alive'
@@ -256,7 +256,7 @@ export function OpportunitiesView({ active }: { active: boolean }) {
                       {view === 'detailed' && (
                         <span className="w-full truncate text-xs text-muted-foreground">
                           {o.last_follow_content
-                            ? `最近跟进：${o.last_follow_content}（${formatDate(o.last_follow_at ?? null)}）`
+                            ? `最近跟进：${plainExcerpt(o.last_follow_content)}（${formatDate(o.last_follow_at ?? null)}）`
                             : '最近跟进：暂无'}
                         </span>
                       )}

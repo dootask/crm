@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { Pencil, Plus } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
 import {
   CUSTOMER_STATUS,
@@ -13,7 +13,7 @@ import {
   type OpportunityStage,
   type TaskLink,
 } from '#/lib/types'
-import { formatDate, formatDateTime, formatMoney, isOverdue } from '#/lib/format'
+import { formatDateTime, formatMoney, isOverdue } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { pickUsers } from '#/lib/dootask'
 import { Button } from '#/components/ui/button.tsx'
@@ -53,6 +53,8 @@ import {
 import { Loading } from '#/components/ui/misc'
 import { BreadcrumbBar } from '#/components/detail/breadcrumb-bar.tsx'
 import { OwnerInlineEdit } from '#/components/detail/owner-field.tsx'
+import { InlineDateEdit } from '#/components/detail/inline-date-field.tsx'
+import { messageError, messageSuccess } from '#/lib/message'
 import { TaskLinksSection } from '#/components/detail/task-links-section.tsx'
 import {
   FollowUpsSection,
@@ -140,9 +142,10 @@ function CustomerDetailPage() {
     if (!window.confirm('确定删除该客户？此操作不可撤销。')) return
     try {
       await api(`/customers/${id}`, { method: 'DELETE' })
+      messageSuccess('客户已删除')
       navigate({ to: '/customers' })
     } catch (e) {
-      window.alert(e instanceof ApiError ? e.message : '删除失败')
+      messageError(e instanceof ApiError ? e.message : '删除失败')
     }
   }
 
@@ -162,10 +165,12 @@ function CustomerDetailPage() {
             variant="outline"
             onClick={() => followRef.current?.focusAdd()}
           >
+            <Plus className="size-4" />
             添加跟进
           </Button>
           <EditCustomerDialog id={id} customer={customer} onSaved={reload} />
           <Button variant="destructive" onClick={del}>
+            <Trash2 className="size-4" />
             删除
           </Button>
         </div>
@@ -232,8 +237,9 @@ function CustomerInfoCard({
         json: { status },
       })
       onChanged()
+      messageSuccess('状态已更新')
     } catch (e) {
-      window.alert(e instanceof ApiError ? e.message : '更新失败')
+      messageError(e instanceof ApiError ? e.message : '更新失败')
     } finally {
       setStatusBusy(false)
     }
@@ -270,22 +276,37 @@ function CustomerInfoCard({
             ownerId={customer.owner_id}
             nameOf={nameOf}
             onChange={async (oid) => {
-              await api<Customer>(`/customers/${id}`, {
-                method: 'PATCH',
-                json: { owner_id: oid },
-              })
-              onChanged()
+              try {
+                await api<Customer>(`/customers/${id}`, {
+                  method: 'PATCH',
+                  json: { owner_id: oid },
+                })
+                onChanged()
+                messageSuccess('负责人已更新')
+              } catch (e) {
+                messageError(e instanceof ApiError ? e.message : '更新失败')
+              }
             }}
           />
         </InfoItem>
         <InfoItem label="下次跟进时间">
-          <span
-            className={
-              overdue ? 'font-medium text-red-600 dark:text-red-400' : ''
-            }
-          >
-            {formatDate(customer.next_follow_at)}
-          </span>
+          <InlineDateEdit
+            label="下次跟进时间"
+            value={customer.next_follow_at}
+            overdue={overdue}
+            onChange={async (next) => {
+              try {
+                await api<Customer>(`/customers/${id}`, {
+                  method: 'PATCH',
+                  json: { next_follow_at: next },
+                })
+                onChanged()
+                messageSuccess('下次跟进时间已更新')
+              } catch (e) {
+                messageError(e instanceof ApiError ? e.message : '更新失败')
+              }
+            }}
+          />
         </InfoItem>
         <InfoItem label="标签">
           {tags.length > 0 ? (
@@ -455,8 +476,9 @@ function ContactsCard({
     try {
       await api(`/contacts/${c.id}`, { method: 'DELETE' })
       onChanged()
+      messageSuccess('联系人已删除')
     } catch (e) {
-      window.alert(e instanceof ApiError ? e.message : '删除失败')
+      messageError(e instanceof ApiError ? e.message : '删除失败')
     }
   }
 

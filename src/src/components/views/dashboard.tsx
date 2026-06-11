@@ -180,7 +180,7 @@ export function DashboardView({ active }: { active: boolean }) {
                           }
                           params={{ id: String(item.id) }}
                           className={cn(
-                            'flex items-center gap-3 py-3 pl-3 transition-colors hover:bg-accent/50',
+                            '-mx-2 flex items-center gap-3 px-2 py-3 transition-colors hover:bg-accent/50',
                             overdue && 'border-l-2 border-destructive',
                           )}
                         >

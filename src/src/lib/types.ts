@@ -45,6 +45,9 @@ export interface Customer {
   created_by: number
   created_at: string
   updated_at: string
+  // 列表「详细」视图用：最近一条跟进（仅列表带 detail 时返回）
+  last_follow_content?: string | null
+  last_follow_at?: string | null
 }
 
 export interface Contact {
@@ -84,6 +87,9 @@ export interface Opportunity {
   created_by: number
   created_at: string
   updated_at: string
+  // 列表「详细」视图用：最近一条跟进（仅列表带 detail 时返回）
+  last_follow_content?: string | null
+  last_follow_at?: string | null
 }
 
 export interface TaskLink {

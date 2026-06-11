@@ -35,6 +35,8 @@ import { Card, CardContent } from '#/components/ui/card.tsx'
 import { CustomerStatusBadge, ToneBadge } from '#/components/ui/badge.tsx'
 import { PageHeader, Loading, EmptyState } from '#/components/ui/misc'
 import { Pager, DEFAULT_PAGE_SIZE } from '#/components/ui/pager.tsx'
+import { ViewToggle, type ListView } from '#/components/ui/view-toggle.tsx'
+import { usePersistentState } from '#/lib/use-persistent'
 
 const STATUS_KEYS = Object.keys(CUSTOMER_STATUS) as Array<CustomerStatus>
 
@@ -54,8 +56,15 @@ export function CustomersView({ active }: { active: boolean }) {
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
   const [status, setStatus] = useState<string>('all')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [page, setPage] = usePersistentState('crm.customers.page', 1)
+  const [pageSize, setPageSize] = usePersistentState(
+    'crm.customers.pageSize',
+    DEFAULT_PAGE_SIZE,
+  )
+  const [view, setView] = usePersistentState<ListView>(
+    'crm.customers.view',
+    'simple',
+  )
   const [createOpen, setCreateOpen] = useState(false)
 
   // 最新查询条件 ref，供 reloadList / 保活刷新读取，避免闭包过期。
@@ -76,6 +85,8 @@ export function CustomersView({ active }: { active: boolean }) {
       if (statusRef.current !== 'all') params.set('status', statusRef.current)
       params.set('page', String(pageRef.current))
       params.set('pageSize', String(pageSizeRef.current))
+      // 始终带回最近一条跟进，「详细」视图直接渲染，切换无需重新请求。
+      params.set('detail', '1')
       const res = await api<{ items: Array<Customer>; total: number }>(
         `/customers?${params.toString()}`,
       )
@@ -155,6 +166,7 @@ export function CustomersView({ active }: { active: boolean }) {
             ))}
           </SelectContent>
         </Select>
+        <ViewToggle value={view} onChange={setView} />
       </div>
 
       {error && (
@@ -182,7 +194,7 @@ export function CustomersView({ active }: { active: boolean }) {
                         params={{ id: String(c.id) }}
                         className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition hover:bg-accent/50"
                       >
-                        <span className="min-w-32 flex-1 font-medium">
+                        <span className="min-w-32 flex-1 text-[15px] font-medium">
                           {c.name}
                         </span>
                         {c.company && (
@@ -210,6 +222,13 @@ export function CustomersView({ active }: { active: boolean }) {
                                 {t}
                               </ToneBadge>
                             ))}
+                          </span>
+                        )}
+                        {view === 'detailed' && (
+                          <span className="w-full truncate text-xs text-muted-foreground">
+                            {c.last_follow_content
+                              ? `最近跟进：${c.last_follow_content}（${formatDate(c.last_follow_at ?? null)}）`
+                              : '最近跟进：暂无'}
                           </span>
                         )}
                       </Link>

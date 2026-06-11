@@ -75,6 +75,9 @@ export async function logEntityChanges(opts: {
   const fields =
     opts.entity === 'customer' ? CUSTOMER_FIELDS : OPPORTUNITY_FIELDS
   const parts: Array<string> = []
+  // 若本次改了下次跟进时间，这条变更记录自身也带上新值，
+  // 让时间线里显示 `下次:` 徽章（与表单添加的记录一致）；清空则为 NULL。
+  let nextFollowAt: string | null = null
   for (const f of fields) {
     if (!(f.key in opts.after)) continue
     const b = opts.before[f.key]
@@ -85,6 +88,9 @@ export async function logEntityChanges(opts: {
     const bs = await fmt(b, opts.token)
     const as = await fmt(a, opts.token)
     parts.push(`${f.label}：${bs} → ${as}`)
+    if (f.key === 'next_follow_at') {
+      nextFollowAt = empty(a) ? null : String(a).slice(0, 10)
+    }
   }
   if (parts.length === 0) return false
 
@@ -93,13 +99,14 @@ export async function logEntityChanges(opts: {
   getDb()
     .prepare(
       `INSERT INTO follow_ups (customer_id, opportunity_id, content, follow_by, next_follow_at)
-       VALUES (?, ?, ?, ?, NULL)`,
+       VALUES (?, ?, ?, ?, ?)`,
     )
     .run(
       opts.customerId,
       opts.opportunityId ?? null,
       content,
       opts.userId,
+      nextFollowAt,
     )
   return true
 }

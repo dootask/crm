@@ -28,6 +28,7 @@ export const Route = createFileRoute('/api/customers/')({
             paged
               ? { limit: pageSize, offset: (Math.max(1, page) - 1) * pageSize }
               : {},
+            { lastFollow: sp.get('detail') === '1' },
           ),
         )
       },

@@ -16,6 +16,8 @@ import { pickUsers } from '#/lib/dootask'
 import { useActivate } from '#/components/keep-alive'
 import { PageHeader, Loading, EmptyState } from '#/components/ui/misc'
 import { Pager, DEFAULT_PAGE_SIZE } from '#/components/ui/pager.tsx'
+import { ViewToggle, type ListView } from '#/components/ui/view-toggle.tsx'
+import { usePersistentState } from '#/lib/use-persistent'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
@@ -48,8 +50,15 @@ export function OpportunitiesView({ active }: { active: boolean }) {
   const [status, setStatus] = useState<'all' | OpportunityStatus>('all')
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [page, setPage] = usePersistentState('crm.opportunities.page', 1)
+  const [pageSize, setPageSize] = usePersistentState(
+    'crm.opportunities.pageSize',
+    DEFAULT_PAGE_SIZE,
+  )
+  const [view, setView] = usePersistentState<ListView>(
+    'crm.opportunities.view',
+    'simple',
+  )
 
   // 搜索防抖
   useEffect(() => {
@@ -66,6 +75,8 @@ export function OpportunitiesView({ active }: { active: boolean }) {
       if (debounced) params.set('search', debounced)
       params.set('page', String(page))
       params.set('pageSize', String(pageSize))
+      // 始终带回最近一条跟进，「详细」视图直接渲染，切换无需重新请求。
+      params.set('detail', '1')
       const res = await api<{ items: Array<Opportunity>; total: number }>(
         `/opportunities?${params.toString()}`,
       )
@@ -188,6 +199,7 @@ export function OpportunitiesView({ active }: { active: boolean }) {
             )}
           </SelectContent>
         </Select>
+        <ViewToggle value={view} onChange={setView} />
       </div>
 
       {error && (
@@ -215,7 +227,7 @@ export function OpportunitiesView({ active }: { active: boolean }) {
                       params={{ id: String(o.id) }}
                       className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition hover:bg-accent/50"
                     >
-                      <span className="min-w-40 flex-1 font-medium">
+                      <span className="min-w-40 flex-1 text-[15px] font-medium">
                         {o.title}
                       </span>
                       <span className="text-sm text-muted-foreground">
@@ -236,6 +248,13 @@ export function OpportunitiesView({ active }: { active: boolean }) {
                       >
                         下次跟进：{formatDate(o.next_follow_at)}
                       </span>
+                      {view === 'detailed' && (
+                        <span className="w-full truncate text-xs text-muted-foreground">
+                          {o.last_follow_content
+                            ? `最近跟进：${o.last_follow_content}（${formatDate(o.last_follow_at ?? null)}）`
+                            : '最近跟进：暂无'}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 ))}

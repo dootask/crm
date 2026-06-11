@@ -24,19 +24,25 @@ function pageItems(current: number, count: number): Array<number | 'gap'> {
   return items
 }
 
-/** 列表分页器：每页条数下拉 + 上/下页 + 页码。total 为 0 时不渲染。 */
+/**
+ * 列表分页器：每页条数下拉 + 上/下页 + 页码。total 为 0 时不渲染。
+ * 仅一页时只显示「共 N 条」，右侧控件隐藏。
+ * hidePageSize 隐藏每页条数下拉（用于固定页大小的场景，如详情页跟进记录）。
+ */
 export function Pager({
   total,
   page,
   pageSize,
   onPageChange,
   onPageSizeChange,
+  hidePageSize = false,
 }: {
   total: number
   page: number
   pageSize: number
   onPageChange: (p: number) => void
-  onPageSizeChange: (n: number) => void
+  onPageSizeChange?: (n: number) => void
+  hidePageSize?: boolean
 }) {
   if (total === 0) return null
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
@@ -44,7 +50,9 @@ export function Pager({
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
       <span className="text-sm text-muted-foreground">共 {total} 条</span>
+      {pageCount > 1 && (
       <div className="flex flex-wrap items-center gap-1">
+        {!hidePageSize && onPageSizeChange && (
         <Select
           value={String(pageSize)}
           onValueChange={(v) => onPageSizeChange(Number(v))}
@@ -60,6 +68,7 @@ export function Pager({
             ))}
           </SelectContent>
         </Select>
+        )}
 
         <Button
           variant="outline"
@@ -101,6 +110,7 @@ export function Pager({
           <ChevronRight className="size-4" />
         </Button>
       </div>
+      )}
     </div>
   )
 }

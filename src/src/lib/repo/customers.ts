@@ -18,6 +18,8 @@ export function listCustomers(
   filter: { search?: string; status?: string; owner_id?: number } = {},
   // 不传 limit 时返回全部（供下拉/映射等场景）；传 limit 则分页。
   page: { limit?: number; offset?: number } = {},
+  // lastFollow=true 时附带每个客户最近一条跟进（列表「详细」视图用）。
+  opts: { lastFollow?: boolean } = {},
 ): { items: Array<Customer>; total: number } {
   const scope = ownerScope(user)
   const where: Array<string> = [scope.clause]
@@ -43,7 +45,14 @@ export function listCustomers(
       .prepare(`SELECT COUNT(*) AS n FROM customers WHERE ${whereSql}`)
       .get(...params) as { n: number }
   ).n
-  let sql = `SELECT * FROM customers WHERE ${whereSql} ORDER BY updated_at DESC, id DESC`
+  const lastFollowCols = opts.lastFollow
+    ? `,
+       (SELECT content FROM follow_ups f WHERE f.customer_id = customers.id
+          ORDER BY f.created_at DESC, f.id DESC LIMIT 1) AS last_follow_content,
+       (SELECT created_at FROM follow_ups f WHERE f.customer_id = customers.id
+          ORDER BY f.created_at DESC, f.id DESC LIMIT 1) AS last_follow_at`
+    : ''
+  let sql = `SELECT customers.*${lastFollowCols} FROM customers WHERE ${whereSql} ORDER BY updated_at DESC, id DESC`
   const qparams = [...params]
   if (page.limit != null) {
     sql += ' LIMIT ? OFFSET ?'

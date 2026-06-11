@@ -10,7 +10,7 @@ import {
   type OpportunityStage,
   type TaskLink,
 } from '#/lib/types'
-import { formatDate, formatMoney, isOverdue } from '#/lib/format'
+import { formatMoney, isOverdue } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { Loading } from '#/components/ui/misc'
 import { Button } from '#/components/ui/button.tsx'
@@ -41,6 +41,8 @@ import {
 } from '#/components/ui/dialog.tsx'
 import { BreadcrumbBar } from '#/components/detail/breadcrumb-bar.tsx'
 import { OwnerInlineEdit } from '#/components/detail/owner-field.tsx'
+import { InlineDateEdit } from '#/components/detail/inline-date-field.tsx'
+import { messageError, messageSuccess, messageWarning } from '#/lib/message'
 import {
   FollowUpsSection,
   type FollowUpsHandle,
@@ -101,14 +103,30 @@ function OpportunityDetailPage() {
     await reload()
   }
 
+  // 快速修改：成功/失败都用统一消息提示，返回是否成功供调用方决定后续（如关闭弹窗）。
+  async function quickPatch(
+    json: Record<string, unknown>,
+    okMsg: string,
+  ): Promise<boolean> {
+    try {
+      await patch(json)
+      messageSuccess(okMsg)
+      return true
+    } catch (e) {
+      messageError(e instanceof ApiError ? e.message : '操作失败')
+      return false
+    }
+  }
+
   async function remove() {
     if (!window.confirm(`确定删除商机「${opportunity.title}」？此操作不可撤销。`))
       return
     try {
       await api(`/opportunities/${id}`, { method: 'DELETE' })
+      messageSuccess('商机已删除')
       navigate({ to: '/opportunities' })
     } catch (e) {
-      window.alert(e instanceof ApiError ? e.message : '删除失败')
+      messageError(e instanceof ApiError ? e.message : '删除失败')
     }
   }
 
@@ -117,6 +135,11 @@ function OpportunityDetailPage() {
       <BreadcrumbBar
         items={[
           { label: '商机', to: '/opportunities' },
+          {
+            label: customer.name,
+            to: '/customers/$id',
+            params: { id: String(customer.id) },
+          },
           { label: opportunity.title },
         ]}
       />
@@ -153,11 +176,11 @@ function OpportunityDetailPage() {
         opportunity={opportunity}
         customer={customer}
         nameOf={nameOf}
-        onPatch={patch}
+        onPatch={quickPatch}
       />
 
       {/* 赢单 / 输单 */}
-      <StatusCard opportunity={opportunity} onPatch={patch} />
+      <StatusCard opportunity={opportunity} onPatch={quickPatch} />
 
       {/* 关联任务 */}
       <TaskLinksSection
@@ -206,18 +229,14 @@ function InfoCard({
   opportunity: Opportunity
   customer: Customer
   nameOf: (id: number) => string
-  onPatch: (json: Record<string, unknown>) => Promise<void>
+  onPatch: (json: Record<string, unknown>, okMsg: string) => Promise<boolean>
 }) {
   const [stageBusy, setStageBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function changeStage(stage: OpportunityStage) {
     setStageBusy(true)
-    setError(null)
     try {
-      await onPatch({ stage })
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : '更新失败')
+      await onPatch({ stage }, '阶段已更新')
     } finally {
       setStageBusy(false)
     }
@@ -229,7 +248,6 @@ function InfoCard({
         <CardTitle>商机信息</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
           <InfoRow label="所属客户">
             <Link
@@ -265,24 +283,29 @@ function InfoCard({
               ownerId={opportunity.owner_id}
               nameOf={nameOf}
               onChange={async (oid) => {
-                await onPatch({ owner_id: oid })
+                await onPatch({ owner_id: oid }, '负责人已更新')
               }}
             />
           </InfoRow>
           <InfoRow label="金额">{formatMoney(opportunity.amount)}</InfoRow>
           <InfoRow label="预计成交时间">
-            {formatDate(opportunity.expected_close_at)}
+            <InlineDateEdit
+              label="预计成交时间"
+              value={opportunity.expected_close_at}
+              onChange={async (next) => {
+                await onPatch({ expected_close_at: next }, '预计成交时间已更新')
+              }}
+            />
           </InfoRow>
           <InfoRow label="下次跟进时间">
-            <span
-              className={
-                isOverdue(opportunity.next_follow_at)
-                  ? 'font-medium text-destructive'
-                  : ''
-              }
-            >
-              {formatDate(opportunity.next_follow_at)}
-            </span>
+            <InlineDateEdit
+              label="下次跟进时间"
+              value={opportunity.next_follow_at}
+              overdue={isOverdue(opportunity.next_follow_at)}
+              onChange={async (next) => {
+                await onPatch({ next_follow_at: next }, '下次跟进时间已更新')
+              }}
+            />
           </InfoRow>
         </div>
       </CardContent>
@@ -405,20 +428,16 @@ function StatusCard({
   onPatch,
 }: {
   opportunity: Opportunity
-  onPatch: (json: Record<string, unknown>) => Promise<void>
+  onPatch: (json: Record<string, unknown>, okMsg: string) => Promise<boolean>
 }) {
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [lostOpen, setLostOpen] = useState(false)
   const [lostReason, setLostReason] = useState('')
 
-  async function run(json: Record<string, unknown>) {
+  async function run(json: Record<string, unknown>, okMsg: string) {
     setBusy(true)
-    setError(null)
     try {
-      await onPatch(json)
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : '操作失败')
+      await onPatch(json, okMsg)
     } finally {
       setBusy(false)
     }
@@ -426,17 +445,19 @@ function StatusCard({
 
   async function submitLost() {
     if (!lostReason.trim()) {
-      setError('请填写输单原因')
+      messageWarning('请填写输单原因')
       return
     }
     setBusy(true)
-    setError(null)
     try {
-      await onPatch({ status: 'lost', lost_reason: lostReason.trim() })
-      setLostOpen(false)
-      setLostReason('')
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : '操作失败')
+      const ok = await onPatch(
+        { status: 'lost', lost_reason: lostReason.trim() },
+        '已标记输单',
+      )
+      if (ok) {
+        setLostOpen(false)
+        setLostReason('')
+      }
     } finally {
       setBusy(false)
     }
@@ -449,13 +470,12 @@ function StatusCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <OppStatusBadge status={opportunity.status} />
-        {error && <p className="text-sm text-destructive">{error}</p>}
 
         {opportunity.status === 'open' ? (
           <div className="flex gap-2">
             <Button
               disabled={busy}
-              onClick={() => run({ status: 'won' })}
+              onClick={() => run({ status: 'won' }, '已标记赢单')}
               className="bg-green-600 text-white hover:bg-green-700"
             >
               标记赢单
@@ -464,7 +484,6 @@ function StatusCard({
               variant="destructive"
               disabled={busy}
               onClick={() => {
-                setError(null)
                 setLostReason('')
                 setLostOpen(true)
               }}
@@ -488,7 +507,7 @@ function StatusCard({
             <Button
               variant="outline"
               disabled={busy}
-              onClick={() => run({ status: 'open', lost_reason: null })}
+              onClick={() => run({ status: 'open', lost_reason: null }, '已重新打开')}
             >
               重新打开
             </Button>
@@ -509,7 +528,6 @@ function StatusCard({
                 placeholder="请填写输单原因"
               />
             </Field>
-            {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>
             <Button variant="destructive" onClick={submitLost} disabled={busy}>

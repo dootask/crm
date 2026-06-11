@@ -17,8 +17,8 @@ jobs:
       run:
         working-directory: src
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
       # 用 corepack 按 src/package.json 的 packageManager 锁 pnpm 版本（10.33.0），

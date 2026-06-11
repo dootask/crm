@@ -21,7 +21,24 @@ import {
 import { cn } from '#/lib/utils.ts'
 import { api, ApiError } from '#/lib/api'
 import { AttachmentList } from '#/components/ui/attachment-list.tsx'
-import type { Attachment } from '#/lib/types'
+import type { Attachment, UploadResult } from '#/lib/types'
+
+// 给内置 Image 扩展加一个 transparent 属性，序列化为 data-transparent，
+// 让透明背景图在渲染端能套棋盘格（标记由后端上传时按 stats.isOpaque 判定）。
+const ImageNode = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      transparent: {
+        default: false,
+        parseHTML: (el: HTMLElement) =>
+          el.getAttribute('data-transparent') === 'true',
+        renderHTML: (attrs: { transparent?: boolean }) =>
+          attrs.transparent ? { 'data-transparent': 'true' } : {},
+      },
+    }
+  },
+})
 
 export interface RichTextEditorHandle {
   /** 滚动到编辑器并聚焦。 */
@@ -30,12 +47,23 @@ export interface RichTextEditorHandle {
   clear: () => void
 }
 
-/** 上传单个文件，返回附件元信息。 */
-async function uploadFile(file: File): Promise<Attachment> {
+/** 上传单个文件，返回附件元信息（含图片是否透明）。 */
+async function uploadFile(file: File): Promise<UploadResult> {
   const fd = new FormData()
   fd.append('file', file)
   // api() 不会给 FormData 设 content-type，浏览器自带 multipart 边界。
-  return api<Attachment>('/uploads', { method: 'POST', body: fd })
+  return api<UploadResult>('/uploads', { method: 'POST', body: fd })
+}
+
+/** 在编辑器当前位置插入一张内联图片（带透明标记）。 */
+function insertImage(ed: Editor, a: UploadResult) {
+  ed.chain()
+    .focus()
+    .insertContent({
+      type: 'image',
+      attrs: { src: a.url, alt: a.name, transparent: a.transparent },
+    })
+    .run()
 }
 
 /** 从剪贴板/拖拽数据里取出文件（优先 files，回退 items）。 */
@@ -128,7 +156,7 @@ export const RichTextEditor = forwardRef<
       for (const f of files) {
         const a = await uploadFile(f)
         if (f.type.startsWith('image/')) {
-          ed.chain().focus().setImage({ src: a.url, alt: a.name }).run()
+          insertImage(ed, a)
         } else {
           added.push(a)
         }
@@ -159,7 +187,7 @@ export const RichTextEditor = forwardRef<
           },
         },
       }),
-      Image.configure({ inline: false }),
+      ImageNode.configure({ inline: false }),
     ],
     editorProps: {
       attributes: { class: 'crm-rich focus:outline-none' },
@@ -186,7 +214,8 @@ export const RichTextEditor = forwardRef<
       const el = wrapperRef.current
       if (el) {
         // 只滚插件自身内层窗口，避免连带父框架位移（与原 focusAdd 行为一致）。
-        const top = el.getBoundingClientRect().top + window.scrollY - 16
+        // 顶部多留些边距，别顶到最上沿（避免滚过头）。
+        const top = el.getBoundingClientRect().top + window.scrollY - 96
         window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
       }
       editor?.chain().focus().run()
@@ -237,7 +266,7 @@ export const RichTextEditor = forwardRef<
     if (!file || !editor) return
     await withUpload(async () => {
       const a = await uploadFile(file)
-      editor.chain().focus().setImage({ src: a.url, alt: a.name }).run()
+      insertImage(editor, a)
     })
   }
 

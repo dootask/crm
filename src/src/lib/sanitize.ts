@@ -23,7 +23,7 @@ const OPTIONS: sanitizeHtml.IOptions = {
   ],
   allowedAttributes: {
     a: ['href', 'target', 'rel'],
-    img: ['src', 'alt'],
+    img: ['src', 'alt', 'data-transparent'],
   },
   // 链接只允许这些协议；javascript: / data: 等会被丢弃。
   allowedSchemes: ['http', 'https', 'mailto'],

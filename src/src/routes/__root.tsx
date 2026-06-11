@@ -4,7 +4,8 @@ import { KeepAliveViews } from '#/components/keep-alive'
 
 import appCss from '../styles.css?url'
 
-const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getItem('theme');var mode=(stored==='light'||stored==='dark'||stored==='auto')?stored:'auto';var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var resolved=mode==='auto'?(prefersDark?'dark':'light'):mode;var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);if(mode==='auto'){root.removeAttribute('data-theme')}else{root.setAttribute('data-theme',mode)}root.style.colorScheme=resolved;}catch(e){}})();`
+// 首屏渲染前同步定主题，避免黑色背景闪烁。优先级：URL ?theme=（主程序 iframe 传入的权威值）> localStorage > 系统配色。
+const THEME_INIT_SCRIPT = `(function(){try{var qp=new URLSearchParams(window.location.search).get('theme');var stored=window.localStorage.getItem('theme');var mode=(qp==='light'||qp==='dark'||qp==='auto')?qp:((stored==='light'||stored==='dark'||stored==='auto')?stored:'auto');var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var resolved=mode==='auto'?(prefersDark?'dark':'light'):mode;var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);if(mode==='auto'){root.removeAttribute('data-theme')}else{root.setAttribute('data-theme',mode)}root.style.colorScheme=resolved;}catch(e){}})();`
 
 export const Route = createRootRoute({
   head: () => ({

@@ -140,7 +140,7 @@ export const FollowUpsSection = forwardRef<
           <ol className="space-y-4">
             {visible.map((f) => (
               <li key={f.id} className="relative pl-5">
-                <span className="absolute top-1.5 left-0 size-2 rounded-full bg-primary/60" />
+                <span className="absolute top-1 left-0 size-2 rounded-full bg-primary/60" />
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">
                     {nameOf(f.follow_by)}

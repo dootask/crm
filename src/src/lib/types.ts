@@ -85,6 +85,11 @@ export interface Attachment {
   mime: string // MIME 类型
 }
 
+/** 上传接口返回：附件元信息 + 是否透明背景（仅图片有意义，供前端棋盘格渲染与内联标记）。 */
+export interface UploadResult extends Attachment {
+  transparent: boolean
+}
+
 export interface FollowUp {
   id: number
   customer_id: number

@@ -8,8 +8,10 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import sharp from 'sharp'
+import type { Metadata } from 'sharp'
 import { dataDir } from '#/lib/db'
-import type { Attachment } from '#/lib/types'
+import type { Attachment, UploadResult } from '#/lib/types'
 
 /** 单文件大小上限：20MB。 */
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
@@ -25,18 +27,70 @@ export function uploadDir(): string {
   return process.env.CRM_UPLOAD_DIR || resolve(dataDir(), 'uploads')
 }
 
+/**
+ * 对图片做无损优化并检测是否含透明像素。
+ * - PNG / 无损 WebP 重压缩（不改像素，仅更优编码），结果更大则保留原图。
+ * - JPEG / GIF 等保持原样，确保「无损」。
+ * - transparent 用 stats.isOpaque 判定：有 alpha 通道但全不透明的图不算透明。
+ * 解析失败（非真正的图片）则原样返回。
+ */
+async function optimizeImage(
+  buf: Buffer,
+): Promise<{ data: Buffer; transparent: boolean }> {
+  let meta: Metadata
+  try {
+    meta = await sharp(buf, { failOn: 'none' }).metadata()
+  } catch {
+    return { data: buf, transparent: false }
+  }
+
+  let transparent = false
+  if (meta.hasAlpha) {
+    try {
+      const st = await sharp(buf, { failOn: 'none' }).stats()
+      transparent = !st.isOpaque
+    } catch {
+      /* 统计失败按不透明处理 */
+    }
+  }
+
+  let optimized: Buffer | null = null
+  try {
+    if (meta.format === 'png') {
+      optimized = await sharp(buf, { failOn: 'none' })
+        .png({ compressionLevel: 9, effort: 10, palette: false })
+        .toBuffer()
+    } else if (meta.format === 'webp') {
+      optimized = await sharp(buf, { failOn: 'none' })
+        .webp({ lossless: true, effort: 6 })
+        .toBuffer()
+    }
+  } catch {
+    /* 压缩失败用原图 */
+  }
+  const data =
+    optimized && optimized.length < buf.length ? optimized : buf
+  return { data, transparent }
+}
+
 /** 保存一个上传文件，返回其元信息（含可直接用于 <img>/下载的 URL）。 */
-export async function saveUpload(file: File): Promise<Attachment> {
+export async function saveUpload(file: File): Promise<UploadResult> {
   const dir = uploadDir()
   mkdirSync(dir, { recursive: true })
   const stored = randomUUID()
-  const buf = Buffer.from(await file.arrayBuffer())
-  writeFileSync(resolve(dir, stored), buf)
+  const original = Buffer.from(await file.arrayBuffer())
+  // 仅对识别为位图的文件走优化/透明检测，其余原样保存。
+  const { data, transparent } =
+    sniffImageType(original) !== null
+      ? await optimizeImage(original)
+      : { data: original, transparent: false }
+  writeFileSync(resolve(dir, stored), data)
   return {
     name: file.name || '未命名文件',
     url: `${URL_PREFIX}${stored}`,
-    size: buf.length,
+    size: data.length,
     mime: file.type || 'application/octet-stream',
+    transparent,
   }
 }
 

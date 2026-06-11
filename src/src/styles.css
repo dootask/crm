@@ -159,8 +159,24 @@
   @apply text-primary underline underline-offset-2;
 }
 .crm-rich img {
-  @apply my-2 h-auto max-w-full rounded-md border;
-  max-height: 20rem; /* 限制显示高度，宽度按比例自适应 */
+  /* 保持官网默认观感：只限制最大宽高、按比例缩放，不加边框/圆角 */
+  @apply my-2 h-auto max-w-full;
+  max-height: 20rem;
+}
+/* 透明背景图片渲染棋盘格，便于辨识透明区域（上传时由后端 stats.isOpaque 判定标记） */
+.crm-rich img[data-transparent='true'] {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #d9d9d9 25%, transparent 25%),
+    linear-gradient(-45deg, #d9d9d9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d9d9d9 75%),
+    linear-gradient(-45deg, transparent 75%, #d9d9d9 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
 }
 /* 只读渲染里的图片可点击放大预览（编辑态点击为选中节点，不加该光标） */
 .crm-rich-view img {

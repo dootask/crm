@@ -51,8 +51,11 @@ export function useDooTask(): DooTaskState {
         try {
           const theme = await tools.getThemeName()
           const dark = String(theme).includes('dark')
-          document.documentElement.classList.toggle('dark', dark)
-          document.documentElement.classList.toggle('light', !dark)
+          const root = document.documentElement
+          root.classList.toggle('dark', dark)
+          root.classList.toggle('light', !dark)
+          // 同步 color-scheme，否则首屏内联脚本写的旧值会残留（如 light 主题下仍 color-scheme: dark）。
+          root.style.colorScheme = dark ? 'dark' : 'light'
         } catch {
           /* 主题获取失败不影响主流程 */
         }

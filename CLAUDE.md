@@ -2,6 +2,12 @@
 
 DooTask 微前端 CRM 插件（appid `crm`），跑在主程序 iframe 里。技术栈：TanStack Start（全栈，file-router + Nitro SSR）+ React 19 + Tailwind v4 + shadcn/ui（`radix-ui`）+ SQLite（better-sqlite3）。下面只记从代码看不出、容易判断错的点。
 
+## 跟主程序 / DooTask 打交道：先读本地，别联网
+主程序、工具库、文档都在本机，查 DooTask API / 约定 / 主程序行为时**读本地源码，不要上网搜 DooTask**（线上会过时/不准）：
+- 主程序源码：`/home/coder/workspaces/dootask`
+- `@dootask/tools` 源码（前端库 + Go/Node/Python SDK）：`/home/coder/workspaces/dootask-tools`
+- 插件开发文档：`/home/coder/workspaces/dootask-appstore/appstore/apps/_/README_CN.md`
+
 ## 命令（都在 `crm/src/` 下跑）
 - 开发：`pnpm dev`（端口 3000）
 - 构建：`pnpm build`（Vite+Nitro，走 esbuild **不做类型检查**）
@@ -38,4 +44,4 @@ DooTask 微前端 CRM 插件（appid `crm`），跑在主程序 iframe 里。技
 ## 部署相关坑
 - Dockerfile 用 `node:20`，`src/package.json` 的 `"packageManager": "pnpm@10.33.0"` **必须保留**——否则 corepack 拉最新 pnpm 11（需 Node≥22）构建直接失败。运行镜像只需 `.output`（Nitro 已把 better-sqlite3 原生模块打进去）。
 - basePath：vite `base:'/apps/crm/'` + router `basepath:'/apps/crm'`。Nitro 把静态资源放在容器根 `/assets`（不带 base），所以 `nginx.conf` 单独把 `/apps/crm/assets/` 剥前缀转发到 `/assets/`，页面和 `/api/*` 不剥。**验证资源必须单独 curl 一个 `/apps/crm/assets/*.js`**，页面 200 不代表资源能加载。
-- `@dootask/tools` 的 `pickUsers/openTask/getUserInfo` 只在 DooTask iframe 内有效，独立浏览器里走降级分支。
+- `@dootask/tools` 同一个包分两侧，别混用：**前端侧**（`lib/dootask.ts`，`appReady/getUserInfo/pickUsers/openTask`）依赖 `window`、**动态 import 避免 SSR 崩**，仅 DooTask iframe 内有效、独立浏览器走降级；**服务端侧**（`lib/dootask-server.ts` 的 `DooTaskClient`）以 token 调主程序 `http://nginx`。别在组件里引服务端、也别在服务端调浏览器 API。

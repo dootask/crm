@@ -2,11 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
-import {
-  CUSTOMER_STATUS,
-  type Customer,
-  type CustomerStatus,
-} from '#/lib/types'
+import type { Customer, CustomerStatus } from '#/lib/types'
+import { useCustomerStatusOptions } from '#/lib/use-options'
 import { formatDate, isOverdue } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { pickUsers } from '#/lib/dootask'
@@ -32,13 +29,12 @@ import {
 } from '#/components/ui/dialog.tsx'
 import { Field } from '#/components/ui/form-field.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
-import { CustomerStatusBadge, ToneBadge } from '#/components/ui/badge.tsx'
+import { CustomerStatusBadge, ToneBadge, ToneDot } from '#/components/ui/badge.tsx'
+import type { Tone } from '#/components/ui/badge.tsx'
 import { PageHeader, Loading, EmptyState } from '#/components/ui/misc'
 import { Pager, DEFAULT_PAGE_SIZE } from '#/components/ui/pager.tsx'
 import { ViewToggle, type ListView } from '#/components/ui/view-toggle.tsx'
 import { usePersistentState } from '#/lib/use-persistent'
-
-const STATUS_KEYS = Object.keys(CUSTOMER_STATUS) as Array<CustomerStatus>
 
 function splitTags(tags: string | null): Array<string> {
   if (!tags) return []
@@ -51,6 +47,7 @@ function splitTags(tags: string | null): Array<string> {
 export function CustomersView({ active }: { active: boolean }) {
   const [list, setList] = useState<Array<Customer>>([])
   const [total, setTotal] = useState(0)
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -66,6 +63,7 @@ export function CustomersView({ active }: { active: boolean }) {
     'simple',
   )
   const [createOpen, setCreateOpen] = useState(false)
+  const statusOptions = useCustomerStatusOptions()
 
   // 最新查询条件 ref，供 reloadList / 保活刷新读取，避免闭包过期。
   const debouncedRef = useRef(debounced)
@@ -87,11 +85,16 @@ export function CustomersView({ active }: { active: boolean }) {
       params.set('pageSize', String(pageSizeRef.current))
       // 始终带回最近一条跟进，「详细」视图直接渲染，切换无需重新请求。
       params.set('detail', '1')
-      const res = await api<{ items: Array<Customer>; total: number }>(
-        `/customers?${params.toString()}`,
-      )
+      // 带回按状态分组的数量，供筛选下拉显示。
+      params.set('counts', '1')
+      const res = await api<{
+        items: Array<Customer>
+        total: number
+        statusCounts?: Record<string, number>
+      }>(`/customers?${params.toString()}`)
       setList(res.items)
       setTotal(res.total)
+      setStatusCounts(res.statusCounts ?? {})
     } catch (e) {
       setError(e instanceof ApiError ? e.message : '加载失败')
     } finally {
@@ -158,10 +161,13 @@ export function CustomersView({ active }: { active: boolean }) {
             <SelectValue placeholder="状态" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">全部状态</SelectItem>
-            {STATUS_KEYS.map((k) => (
-              <SelectItem key={k} value={k}>
-                {CUSTOMER_STATUS[k]}
+            <SelectItem value="all">
+              全部状态 ({Object.values(statusCounts).reduce((a, b) => a + b, 0)})
+            </SelectItem>
+            {statusOptions.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                <ToneDot tone={o.tone as Tone} />
+                {o.label} ({statusCounts[o.value] ?? 0})
               </SelectItem>
             ))}
           </SelectContent>
@@ -264,9 +270,11 @@ function CreateCustomerDialog({
   onOpenChange: (v: boolean) => void
   onCreated: () => void
 }) {
+  const statusOptions = useCustomerStatusOptions()
+  const defaultStatus = statusOptions[0]?.value ?? 'lead'
   const [name, setName] = useState('')
   const [company, setCompany] = useState('')
-  const [status, setStatus] = useState<CustomerStatus>('lead')
+  const [status, setStatus] = useState<CustomerStatus>(defaultStatus)
   const [source, setSource] = useState('')
   const [tags, setTags] = useState('')
   const [note, setNote] = useState('')
@@ -283,7 +291,7 @@ function CreateCustomerDialog({
     if (!open) return
     setName('')
     setCompany('')
-    setStatus('lead')
+    setStatus(defaultStatus)
     setSource('')
     setTags('')
     setNote('')
@@ -369,9 +377,10 @@ function CreateCustomerDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_KEYS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {CUSTOMER_STATUS[k]}
+                  {statusOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      <ToneDot tone={o.tone as Tone} />
+                      {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

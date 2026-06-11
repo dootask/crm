@@ -1,10 +1,7 @@
 import { getDb } from '#/lib/db'
 import { resolveUsers } from '#/lib/dootask-server'
-import {
-  CUSTOMER_STATUS,
-  OPPORTUNITY_STAGE,
-  OPPORTUNITY_STATUS,
-} from '#/lib/types'
+import { labelMap } from '#/lib/repo/options'
+import { OPPORTUNITY_STATUS } from '#/lib/types'
 
 type FieldDef = {
   key: string
@@ -23,14 +20,12 @@ async function ownerName(v: unknown, token: string | null): Promise<string> {
   return map[id]?.nickname ?? `用户#${id}`
 }
 
+// status（客户）/ stage（商机）的中文名取自可配置选项，运行时按 value 解析，
+// 因此这两个字段不在此写死 format，统一在 logEntityChanges 里用 labelMap 处理。
 const CUSTOMER_FIELDS: Array<FieldDef> = [
   { key: 'name', label: '名称' },
   { key: 'company', label: '公司' },
-  {
-    key: 'status',
-    label: '状态',
-    format: (v) => CUSTOMER_STATUS[v as keyof typeof CUSTOMER_STATUS] ?? show(v),
-  },
+  { key: 'status', label: '状态' },
   { key: 'source', label: '来源' },
   { key: 'tags', label: '标签' },
   { key: 'note', label: '备注' },
@@ -40,12 +35,7 @@ const CUSTOMER_FIELDS: Array<FieldDef> = [
 
 const OPPORTUNITY_FIELDS: Array<FieldDef> = [
   { key: 'title', label: '标题' },
-  {
-    key: 'stage',
-    label: '阶段',
-    format: (v) =>
-      OPPORTUNITY_STAGE[v as keyof typeof OPPORTUNITY_STAGE] ?? show(v),
-  },
+  { key: 'stage', label: '阶段' },
   {
     key: 'status',
     label: '状态',
@@ -74,6 +64,11 @@ export async function logEntityChanges(opts: {
 }): Promise<boolean> {
   const fields =
     opts.entity === 'customer' ? CUSTOMER_FIELDS : OPPORTUNITY_FIELDS
+  // 该实体里「可配置选项」字段的 key 及其 value→label 映射。
+  const optionKey = opts.entity === 'customer' ? 'status' : 'stage'
+  const optionLabels = labelMap(
+    opts.entity === 'customer' ? 'customer_status' : 'opportunity_stage',
+  )
   const parts: Array<string> = []
   // 若本次改了下次跟进时间，这条变更记录自身也带上新值，
   // 让时间线里显示 `下次:` 徽章（与表单添加的记录一致）；清空则为 NULL。
@@ -84,9 +79,16 @@ export async function logEntityChanges(opts: {
     const a = opts.after[f.key]
     // 归一化空值后比较
     if (show(b) === show(a)) continue
-    const fmt = f.format ?? ((v: unknown) => show(v))
-    const bs = await fmt(b, opts.token)
-    const as = await fmt(a, opts.token)
+    let bs: string
+    let as: string
+    if (f.key === optionKey) {
+      bs = empty(b) ? '空' : (optionLabels[String(b)] ?? show(b))
+      as = empty(a) ? '空' : (optionLabels[String(a)] ?? show(a))
+    } else {
+      const fmt = f.format ?? ((v: unknown) => show(v))
+      bs = await fmt(b, opts.token)
+      as = await fmt(a, opts.token)
+    }
     parts.push(`${f.label}：${bs} → ${as}`)
     if (f.key === 'next_follow_at') {
       nextFollowAt = empty(a) ? null : String(a).slice(0, 10)

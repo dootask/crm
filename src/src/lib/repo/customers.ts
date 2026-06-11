@@ -19,27 +19,37 @@ export function listCustomers(
   // 不传 limit 时返回全部（供下拉/映射等场景）；传 limit 则分页。
   page: { limit?: number; offset?: number } = {},
   // lastFollow=true 时附带每个客户最近一条跟进（列表「详细」视图用）。
-  opts: { lastFollow?: boolean } = {},
-): { items: Array<Customer>; total: number } {
+  // statusCounts=true 时附带「按状态分组的数量」（忽略 status 筛选自身，供筛选下拉显示）。
+  opts: { lastFollow?: boolean; statusCounts?: boolean } = {},
+): {
+  items: Array<Customer>
+  total: number
+  statusCounts?: Record<string, number>
+} {
   const scope = ownerScope(user)
-  const where: Array<string> = [scope.clause]
-  const params: Array<unknown> = [...scope.params]
+  const db = getDb()
 
+  // 基础条件（scope + owner_id + search）：用于按状态计数（不含 status 筛选）。
+  const baseWhere: Array<string> = [scope.clause]
+  const baseParams: Array<unknown> = [...scope.params]
+  if (filter.owner_id) {
+    baseWhere.push('owner_id = ?')
+    baseParams.push(filter.owner_id)
+  }
+  if (filter.search) {
+    baseWhere.push('(name LIKE ? OR company LIKE ? OR tags LIKE ?)')
+    const like = `%${filter.search}%`
+    baseParams.push(like, like, like)
+  }
+
+  // 列表/总数条件：在基础条件上再叠加 status 筛选。
+  const where = [...baseWhere]
+  const params = [...baseParams]
   if (filter.status) {
     where.push('status = ?')
     params.push(filter.status)
   }
-  if (filter.owner_id) {
-    where.push('owner_id = ?')
-    params.push(filter.owner_id)
-  }
-  if (filter.search) {
-    where.push('(name LIKE ? OR company LIKE ? OR tags LIKE ?)')
-    const like = `%${filter.search}%`
-    params.push(like, like, like)
-  }
   const whereSql = where.join(' AND ')
-  const db = getDb()
   const total = (
     db
       .prepare(`SELECT COUNT(*) AS n FROM customers WHERE ${whereSql}`)
@@ -59,7 +69,18 @@ export function listCustomers(
     qparams.push(page.limit, page.offset ?? 0)
   }
   const items = db.prepare(sql).all(...qparams) as Array<Customer>
-  return { items, total }
+
+  if (!opts.statusCounts) return { items, total }
+
+  const baseWhereSql = baseWhere.join(' AND ')
+  const rows = db
+    .prepare(
+      `SELECT status, COUNT(*) AS n FROM customers WHERE ${baseWhereSql} GROUP BY status`,
+    )
+    .all(...baseParams) as Array<{ status: string; n: number }>
+  const statusCounts: Record<string, number> = {}
+  for (const r of rows) statusCounts[r.status] = r.n
+  return { items, total, statusCounts }
 }
 
 export function getCustomer(id: number): Customer | undefined {

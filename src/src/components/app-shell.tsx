@@ -7,6 +7,7 @@ import { useDooTask } from '#/lib/dootask'
 import type { DooTaskUser } from '#/lib/dootask'
 import { api } from '#/lib/api'
 import type { AuthUser } from '#/lib/types'
+import { OptionsProvider } from '#/lib/use-options'
 
 const NAV = [
   { to: '/', label: '仪表盘', icon: LayoutDashboard, exact: true, admin: false },
@@ -36,6 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [status])
 
   return (
+    <OptionsProvider>
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 max-sm:gap-1.5 max-sm:px-3">
@@ -63,6 +65,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
     </div>
+    </OptionsProvider>
   )
 }
 

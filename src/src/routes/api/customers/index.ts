@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { badRequest, created, ok, readJson, resolveUser } from '#/lib/auth'
 import { createCustomer, listCustomers } from '#/lib/repo/customers'
+import { isActiveValue } from '#/lib/repo/options'
 import type { CustomerStatus } from '#/lib/types'
 
 // GET  /apps/crm/api/customers?search=&status=&owner_id=  列表（按权限过滤）
@@ -28,7 +29,10 @@ export const Route = createFileRoute('/api/customers/')({
             paged
               ? { limit: pageSize, offset: (Math.max(1, page) - 1) * pageSize }
               : {},
-            { lastFollow: sp.get('detail') === '1' },
+            {
+              lastFollow: sp.get('detail') === '1',
+              statusCounts: sp.get('counts') === '1',
+            },
           ),
         )
       },
@@ -40,6 +44,8 @@ export const Route = createFileRoute('/api/customers/')({
         const b = body as Record<string, unknown>
         const name = String(b.name ?? '').trim()
         if (!name) return badRequest('客户名称必填')
+        if (b.status != null && !isActiveValue('customer_status', String(b.status)))
+          return badRequest('客户状态无效')
         const customer = createCustomer(
           {
             name,

@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { badRequest, ok, readJson, resolveUser } from '#/lib/auth'
 import { requireCustomer } from '#/lib/guards'
 import { deleteCustomer, updateCustomer } from '#/lib/repo/customers'
+import { isActiveValue } from '#/lib/repo/options'
 import { logEntityChanges } from '#/lib/changelog'
 import { listContacts } from '#/lib/repo/contacts'
 import { listFollowUps } from '#/lib/repo/followups'
@@ -49,6 +50,8 @@ export const Route = createFileRoute('/api/customers/$id')({
         const body = await readJson(request)
         if (!body) return badRequest('请求体无效')
         const b = body as Record<string, unknown>
+        if (b.status != null && !isActiveValue('customer_status', String(b.status)))
+          return badRequest('客户状态无效')
         const before = g.customer
         const updated = updateCustomer(id, {
           name: b.name as string | undefined,

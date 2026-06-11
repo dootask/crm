@@ -7,6 +7,7 @@ import {
 } from '#/lib/repo/opportunities'
 import { logEntityChanges } from '#/lib/changelog'
 import { getCustomer } from '#/lib/repo/customers'
+import { isActiveValue } from '#/lib/repo/options'
 import { listFollowUps } from '#/lib/repo/followups'
 import { listTaskLinks } from '#/lib/repo/tasklinks'
 import type { OpportunityStage, OpportunityStatus } from '#/lib/types'
@@ -46,6 +47,8 @@ export const Route = createFileRoute('/api/opportunities/$id')({
         const body = await readJson(request)
         if (!body) return badRequest('请求体无效')
         const b = body as Record<string, unknown>
+        if (b.stage != null && !isActiveValue('opportunity_stage', String(b.stage)))
+          return badRequest('商机阶段无效')
         const before = g.opportunity
         const updated = updateOpportunity(g.opportunity.id, {
           title: b.title as string | undefined,

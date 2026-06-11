@@ -1,25 +1,39 @@
 // CRM 共享类型与枚举（前后端共用）。
 
-export type CustomerStatus = 'lead' | 'following' | 'signed' | 'lost'
+// 客户状态 / 商机阶段已改为「运行时可配置」（存于 option_items 表，管理页维护）。
+// 下面的字面量联合放宽为 string 以接纳任意码值；常量映射保留作为：
+//   1) 首次安装的种子默认项（见 lib/db.ts seedOptions）
+//   2) 前端选项尚未加载时的兜底标签（见 lib/use-options.tsx）
+export type CustomerStatus = string
 
-export const CUSTOMER_STATUS: Record<CustomerStatus, string> = {
+export const CUSTOMER_STATUS: Record<string, string> = {
   lead: '潜在',
   following: '跟进中',
   signed: '已成交',
   lost: '已流失',
 }
 
-export type OpportunityStage =
-  | 'initial'
-  | 'qualified'
-  | 'proposal'
-  | 'negotiation'
+export type OpportunityStage = string
 
-export const OPPORTUNITY_STAGE: Record<OpportunityStage, string> = {
+export const OPPORTUNITY_STAGE: Record<string, string> = {
   initial: '初步接触',
   qualified: '需求确认',
   proposal: '方案报价',
   negotiation: '商务谈判',
+}
+
+/** 可配置选项的分类。 */
+export type OptionCategory = 'customer_status' | 'opportunity_stage'
+
+/** 一条可配置选项（option_items 表行）。tone 对应 badge.tsx 的 Tone。 */
+export interface OptionItem {
+  id: number
+  category: OptionCategory
+  value: string
+  label: string
+  tone: string
+  sort_order: number
+  archived: number // 0 | 1
 }
 
 export type OpportunityStatus = 'open' | 'won' | 'lost'

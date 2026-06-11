@@ -2,17 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
-import {
-  CUSTOMER_STATUS,
-  OPPORTUNITY_STAGE,
-  type Contact,
-  type Customer,
-  type CustomerStatus,
-  type FollowUp,
-  type Opportunity,
-  type OpportunityStage,
-  type TaskLink,
+import type {
+  Contact,
+  Customer,
+  CustomerStatus,
+  FollowUp,
+  Opportunity,
+  OpportunityStage,
+  TaskLink,
 } from '#/lib/types'
+import {
+  useCustomerStatusOptions,
+  useOpportunityStageOptions,
+} from '#/lib/use-options'
 import { formatDateTime, formatMoney, isOverdue } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { pickUsers } from '#/lib/dootask'
@@ -49,7 +51,9 @@ import {
   OppStatusBadge,
   StageBadge,
   ToneBadge,
+  ToneDot,
 } from '#/components/ui/badge.tsx'
+import type { Tone } from '#/components/ui/badge.tsx'
 import { Loading } from '#/components/ui/misc'
 import { BreadcrumbBar } from '#/components/detail/breadcrumb-bar.tsx'
 import { OwnerInlineEdit } from '#/components/detail/owner-field.tsx'
@@ -72,9 +76,6 @@ interface Detail {
   follow_ups: Array<FollowUp>
   task_links: Array<TaskLink>
 }
-
-const STATUS_KEYS = Object.keys(CUSTOMER_STATUS) as Array<CustomerStatus>
-const STAGE_KEYS = Object.keys(OPPORTUNITY_STAGE) as Array<OpportunityStage>
 
 function splitTags(tags: string | null): Array<string> {
   if (!tags) return []
@@ -225,6 +226,7 @@ function CustomerInfoCard({
   onChanged: () => void
 }) {
   const [statusBusy, setStatusBusy] = useState(false)
+  const statusOptions = useCustomerStatusOptions()
   const overdue = isOverdue(customer.next_follow_at)
   const tags = splitTags(customer.tags)
 
@@ -262,9 +264,10 @@ function CustomerInfoCard({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {STATUS_KEYS.map((k) => (
-                <SelectItem key={k} value={k}>
-                  {CUSTOMER_STATUS[k]}
+              {statusOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  <ToneDot tone={o.tone as Tone} />
+                  {o.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -723,9 +726,11 @@ function NewOpportunityDialog({
   customerId: string
   onCreated: () => void
 }) {
+  const stageOptions = useOpportunityStageOptions()
+  const defaultStage = stageOptions[0]?.value ?? 'initial'
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
-  const [stage, setStage] = useState<OpportunityStage>('initial')
+  const [stage, setStage] = useState<OpportunityStage>(defaultStage)
   const [amount, setAmount] = useState('')
   const [expectedCloseAt, setExpectedCloseAt] = useState<string | undefined>(
     undefined,
@@ -739,7 +744,7 @@ function NewOpportunityDialog({
   useEffect(() => {
     if (!open) return
     setTitle('')
-    setStage('initial')
+    setStage(defaultStage)
     setAmount('')
     setExpectedCloseAt(undefined)
     setOwnerId(null)
@@ -819,9 +824,10 @@ function NewOpportunityDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STAGE_KEYS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {OPPORTUNITY_STAGE[k]}
+                  {stageOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      <ToneDot tone={o.tone as Tone} />
+                      {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

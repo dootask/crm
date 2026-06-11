@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
-import {
-  OPPORTUNITY_STAGE,
-  OPPORTUNITY_STATUS,
-  type Customer,
-  type Opportunity,
-  type OpportunityStage,
-  type OpportunityStatus,
+import { OPPORTUNITY_STATUS } from '#/lib/types'
+import type {
+  Customer,
+  Opportunity,
+  OpportunityStage,
+  OpportunityStatus,
 } from '#/lib/types'
+import { useOpportunityStageOptions } from '#/lib/use-options'
 import { formatDate, formatMoney, isOverdue } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { pickUsers } from '#/lib/dootask'
@@ -23,7 +23,8 @@ import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Field } from '#/components/ui/form-field.tsx'
 import { DatePicker } from '#/components/ui/date-picker.tsx'
-import { OppStatusBadge, StageBadge } from '#/components/ui/badge.tsx'
+import { OppStatusBadge, StageBadge, ToneDot } from '#/components/ui/badge.tsx'
+import type { Tone } from '#/components/ui/badge.tsx'
 import {
   Select,
   SelectContent,
@@ -59,6 +60,7 @@ export function OpportunitiesView({ active }: { active: boolean }) {
     'crm.opportunities.view',
     'simple',
   )
+  const stageOptions = useOpportunityStageOptions()
 
   // 搜索防抖
   useEffect(() => {
@@ -171,13 +173,12 @@ export function OpportunitiesView({ active }: { active: boolean }) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全部阶段</SelectItem>
-            {(Object.keys(OPPORTUNITY_STAGE) as Array<OpportunityStage>).map(
-              (k) => (
-                <SelectItem key={k} value={k}>
-                  {OPPORTUNITY_STAGE[k]}
-                </SelectItem>
-              ),
-            )}
+            {stageOptions.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                <ToneDot tone={o.tone as Tone} />
+                {o.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -281,11 +282,13 @@ export function OpportunitiesView({ active }: { active: boolean }) {
 /* ---------- 新建商机 ---------- */
 
 function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
+  const stageOptions = useOpportunityStageOptions()
+  const defaultStage = stageOptions[0]?.value ?? 'initial'
   const [open, setOpen] = useState(false)
   const [customers, setCustomers] = useState<Array<Customer>>([])
   const [customerId, setCustomerId] = useState('')
   const [title, setTitle] = useState('')
-  const [stage, setStage] = useState<OpportunityStage>('initial')
+  const [stage, setStage] = useState<OpportunityStage>(defaultStage)
   const [amount, setAmount] = useState('')
   const [expectedCloseAt, setExpectedCloseAt] = useState<string | undefined>(
     undefined,
@@ -303,7 +306,7 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
     if (!open) return
     setCustomerId('')
     setTitle('')
-    setStage('initial')
+    setStage(defaultStage)
     setAmount('')
     setExpectedCloseAt(undefined)
     setNextFollowAt(undefined)
@@ -412,11 +415,10 @@ function NewOpportunityDialog({ onCreated }: { onCreated: () => void }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(
-                    Object.keys(OPPORTUNITY_STAGE) as Array<OpportunityStage>
-                  ).map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {OPPORTUNITY_STAGE[k]}
+                  {stageOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      <ToneDot tone={o.tone as Tone} />
+                      {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

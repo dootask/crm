@@ -1,24 +1,17 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  Download,
-  HardDriveDownload,
-  RotateCcw,
-  ShieldAlert,
-  Trash2,
-} from 'lucide-react'
+import { Download, HardDriveDownload, RotateCcw, Trash2 } from 'lucide-react'
 import { api, ApiError, getAuthUserId } from '#/lib/api'
 import { confirmDialog, downloadViaDooTask } from '#/lib/dootask'
 import { messageError, messageSuccess } from '#/lib/message'
 import { formatDateTime } from '#/lib/format'
-import type { AuthUser } from '#/lib/types'
+import { AdminGate } from '#/components/admin/admin-gate.tsx'
+import { BreadcrumbBar } from '#/components/detail/breadcrumb-bar.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { EmptyState, Loading, PageHeader } from '#/components/ui/misc.tsx'
 
-// 管理页：仅管理员可见，提供数据库备份与还原。
-// 列表内容自渲染，不走 keep-alive（详情类普通路由）。
-export const Route = createFileRoute('/admin')({ component: AdminPage })
+export const Route = createFileRoute('/admin/backup')({ component: BackupPage })
 
 interface BackupEntry {
   name: string
@@ -32,40 +25,43 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function AdminPage() {
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+function BackupPage() {
+  return (
+    <div>
+      <BreadcrumbBar
+        items={[{ label: '管理', to: '/admin' }, { label: '数据库备份' }]}
+      />
+      <AdminGate>
+        <BackupManager />
+      </AdminGate>
+    </div>
+  )
+}
+
+function BackupManager() {
   const [items, setItems] = useState<Array<BackupEntry>>([])
   const [loading, setLoading] = useState(true)
-  const [working, setWorking] = useState<string | null>(null) // 'backup' | 'restore:<name>' | 'delete:<name>'
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const me = await api<AuthUser>('/me')
-        if (cancelled) return
-        if (!me.isAdmin) {
-          setIsAdmin(false)
-          return
-        }
-        setIsAdmin(true)
-        await reload()
-      } catch {
-        if (!cancelled) setIsAdmin(false)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const [working, setWorking] = useState<string | null>(null)
 
   async function reload() {
     const res = await api<{ items: Array<BackupEntry> }>('/admin/backups')
     setItems(res.items)
   }
+
+  useEffect(() => {
+    let cancelled = false
+    reload()
+      .catch((e) => {
+        if (!cancelled)
+          messageError(e instanceof ApiError ? e.message : '加载失败')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleBackup() {
     setWorking('backup')
@@ -128,24 +124,11 @@ function AdminPage() {
     }
   }
 
-  if (isAdmin === false) {
-    return (
-      <div>
-        <PageHeader title="管理" />
-        <EmptyState
-          title="无权限"
-          hint="该功能仅管理员可用"
-          action={<ShieldAlert className="mt-1 size-6 text-muted-foreground" />}
-        />
-      </div>
-    )
-  }
-
   return (
     <div>
       <PageHeader
-        title="数据库管理"
-        description="备份与还原 CRM 数据库"
+        title="数据库备份"
+        description="备份、还原与下载 CRM 数据库"
         action={
           <Button onClick={handleBackup} disabled={working === 'backup'}>
             <HardDriveDownload className="size-4" />
@@ -167,7 +150,9 @@ function AdminPage() {
           <CardContent className="p-0">
             <ul className="divide-y">
               {items.map((b) => {
-                const busy = working === `restore:${b.name}` || working === `delete:${b.name}`
+                const busy =
+                  working === `restore:${b.name}` ||
+                  working === `delete:${b.name}`
                 return (
                   <li
                     key={b.name}

@@ -24,6 +24,7 @@ export function getDb(): Database.Database {
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   migrate(db)
+  seedOptions(db)
   seed(db)
   _db = db
   return db
@@ -103,6 +104,18 @@ function migrate(db: Database.Database) {
       created_at     TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS option_items (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      category   TEXT NOT NULL,
+      value      TEXT NOT NULL,
+      label      TEXT NOT NULL,
+      tone       TEXT NOT NULL DEFAULT 'gray',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      archived   INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(category, value)
+    );
+
     CREATE TABLE IF NOT EXISTS task_links (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       entity_type TEXT NOT NULL,
@@ -124,7 +137,43 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_follow_customer       ON follow_ups(customer_id);
     CREATE INDEX IF NOT EXISTS idx_follow_opp            ON follow_ups(opportunity_id);
     CREATE INDEX IF NOT EXISTS idx_tasklinks_entity      ON task_links(entity_type, entity_id);
+    CREATE INDEX IF NOT EXISTS idx_option_items_cat      ON option_items(category, sort_order);
   `)
+}
+
+// 可配置选项的内置默认项：与 lib/types.ts 常量、badge.tsx 的 tone 映射保持一致。
+const DEFAULT_OPTIONS: Array<{
+  category: 'customer_status' | 'opportunity_stage'
+  value: string
+  label: string
+  tone: string
+}> = [
+  { category: 'customer_status', value: 'lead', label: '潜在', tone: 'gray' },
+  { category: 'customer_status', value: 'following', label: '跟进中', tone: 'blue' },
+  { category: 'customer_status', value: 'signed', label: '已成交', tone: 'green' },
+  { category: 'customer_status', value: 'lost', label: '已流失', tone: 'red' },
+  { category: 'opportunity_stage', value: 'initial', label: '初步接触', tone: 'gray' },
+  { category: 'opportunity_stage', value: 'qualified', label: '需求确认', tone: 'cyan' },
+  { category: 'opportunity_stage', value: 'proposal', label: '方案报价', tone: 'violet' },
+  { category: 'opportunity_stage', value: 'negotiation', label: '商务谈判', tone: 'amber' },
+]
+
+/** 幂等播种：某分类无任何行时插入内置默认项（不依赖 customers 是否为空）。 */
+function seedOptions(db: Database.Database) {
+  const ins = db.prepare(
+    `INSERT INTO option_items (category, value, label, tone, sort_order)
+     VALUES (?, ?, ?, ?, ?)`,
+  )
+  for (const cat of ['customer_status', 'opportunity_stage'] as const) {
+    const n = (
+      db
+        .prepare('SELECT COUNT(*) AS c FROM option_items WHERE category = ?')
+        .get(cat) as { c: number }
+    ).c
+    if (n > 0) continue
+    const rows = DEFAULT_OPTIONS.filter((o) => o.category === cat)
+    rows.forEach((o, i) => ins.run(o.category, o.value, o.label, o.tone, i))
+  }
 }
 
 /** 仅在客户表为空时塞入演示数据，方便安装后立刻看到效果。 */

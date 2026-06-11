@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
-import {
-  OPPORTUNITY_STAGE,
-  type Customer,
-  type FollowUp,
-  type Opportunity,
-  type OpportunityStage,
-  type TaskLink,
+import type {
+  Customer,
+  FollowUp,
+  Opportunity,
+  OpportunityStage,
+  TaskLink,
 } from '#/lib/types'
+import { useOpportunityStageOptions } from '#/lib/use-options'
 import { formatMoney, isOverdue } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
 import { Loading } from '#/components/ui/misc'
@@ -18,7 +18,8 @@ import { Input } from '#/components/ui/input.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
 import { Field } from '#/components/ui/form-field.tsx'
 import { DatePicker } from '#/components/ui/date-picker.tsx'
-import { OppStatusBadge } from '#/components/ui/badge.tsx'
+import { OppStatusBadge, ToneDot } from '#/components/ui/badge.tsx'
+import type { Tone } from '#/components/ui/badge.tsx'
 import {
   Card,
   CardContent,
@@ -232,6 +233,7 @@ function InfoCard({
   onPatch: (json: Record<string, unknown>, okMsg: string) => Promise<boolean>
 }) {
   const [stageBusy, setStageBusy] = useState(false)
+  const stageOptions = useOpportunityStageOptions()
 
   async function changeStage(stage: OpportunityStage) {
     setStageBusy(true)
@@ -268,13 +270,12 @@ function InfoCard({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(OPPORTUNITY_STAGE) as Array<OpportunityStage>).map(
-                  (k) => (
-                    <SelectItem key={k} value={k}>
-                      {OPPORTUNITY_STAGE[k]}
-                    </SelectItem>
-                  ),
-                )}
+                {stageOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    <ToneDot tone={o.tone as Tone} />
+                    {o.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </InfoRow>

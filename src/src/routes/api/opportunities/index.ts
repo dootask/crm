@@ -5,6 +5,7 @@ import {
   createOpportunity,
   listOpportunities,
 } from '#/lib/repo/opportunities'
+import { isActiveValue } from '#/lib/repo/options'
 import type { OpportunityStage, OpportunityStatus } from '#/lib/types'
 
 // GET  /apps/crm/api/opportunities?customer_id=&stage=&status=&owner_id=&search=
@@ -49,6 +50,8 @@ export const Route = createFileRoute('/api/opportunities/')({
         const title = String(b.title ?? '').trim()
         if (!Number.isFinite(customerId)) return badRequest('缺少 customer_id')
         if (!title) return badRequest('商机标题必填')
+        if (b.stage != null && !isActiveValue('opportunity_stage', String(b.stage)))
+          return badRequest('商机阶段无效')
         // 商机归属其客户，需有客户访问权
         const g = requireCustomer(user, customerId)
         if (g.deny) return g.deny

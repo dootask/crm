@@ -1,0 +1,79 @@
+name: Release
+
+# 推送 tag（纯数字版本号，不带 v 前缀）触发：
+# 1) 多架构构建镜像推到 Docker Hub dootask/crm
+# 2) 打包插件元数据 + 版本目录，发布到 DooTask 应用商店（appid: crm）
+#
+# 依赖 4 个仓库 Secret：
+#   DOCKER_USERNAME / DOCKER_PASSWORD   （组织账号需为 dootask，镜像名才是 dootask/crm）
+#   DOOTASK_USERNAME / DOOTASK_PASSWORD
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # 前端工程在 src/，Dockerfile 也在 src/Dockerfile（Nitro 把服务端依赖打进 .output）
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: src
+          file: ./src/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # CRM 用真实的按版本号命名的目录（如 0.2.0/），发版前需已提交。
+      # 打包根目录的插件元数据 + 该版本目录，排除前端工程与开发文件。
+      - name: Create plugin tar.gz package
+        run: |
+          raw_tag="${{ github.ref_name }}"
+          version="${raw_tag#v}"
+          if [ ! -d "$version" ]; then
+            echo "::error::版本目录 ${version}/ 不存在；发版前需先创建并提交 ${version}/（见 release-plugin 技能）。"
+            exit 1
+          fi
+          tar -czf plugin.tar.gz \
+            config.yml logo.svg README.md README_zh.md "$version"
+          echo "Package created: plugin.tar.gz"
+          ls -la plugin.tar.gz
+          tar -tzf plugin.tar.gz
+
+      - name: Publish to DooTask App Store
+        id: publish
+        uses: dootask/appstore-action@v2
+        with:
+          username: ${{ secrets.DOOTASK_USERNAME }}
+          password: ${{ secrets.DOOTASK_PASSWORD }}
+          appid: 'crm'
+          package_file: './plugin.tar.gz'
+          draft: false

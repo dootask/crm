@@ -1,0 +1,33 @@
+name: CI
+
+# 质量门禁：push 到 main / 任意 PR 跑 lint + build（构建走 Vite+Nitro，能抓出真实错误）。
+# 发布（推 tag）不重跑本流程，发版前确认这里是绿的。
+# 说明：仓库暂无测试文件，故不跑 test；类型检查按项目约定本地自查（npx tsc --noEmit），CI 不跑。
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # 用 corepack 按 src/package.json 的 packageManager 锁 pnpm 版本（10.33.0），
+      # 不要固定别的版本，否则需 Node≥22 会构建失败（见 CLAUDE.md）。
+      - name: Install dependencies
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Build
+        run: pnpm build

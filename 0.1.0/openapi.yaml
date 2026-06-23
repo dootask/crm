@@ -1,0 +1,1106 @@
+openapi: 3.0.3
+info:
+  title: CRM API
+  version: 1.0.0
+  description: >-
+    DooTask CRM 插件的 HTTP API。覆盖客户、联系人、商机、跟进记录、关联任务、文件上传、
+    选项字典与管理设置等能力，供 `doo app call crm <operationId>` 调用。
+    鉴权由 DooTask 宿主自动注入（Token / X-Doo-User-Id 等），调用时无需声明鉴权请求头；
+    服务端依据 x-user-id 解析当前用户并按归属过滤数据（管理员可见全部）。
+    所有成功响应统一包裹为 { "data": ... }，错误为 { "error": "..." }。
+    容器内服务监听 3000 端口，basepath 为 /apps/crm，故所有路径以 /apps/crm/api/ 开头。
+
+tags:
+  - name: customers
+    description: 客户
+  - name: contacts
+    description: 联系人
+  - name: opportunities
+    description: 商机
+  - name: followups
+    description: 跟进记录
+  - name: tasks
+    description: 关联 DooTask 任务
+  - name: uploads
+    description: 文件上传与下载
+  - name: settings
+    description: 管理设置与字典维护
+  - name: options
+    description: 选项字典（状态/阶段等）
+  - name: backup
+    description: 数据库备份（管理员）
+  - name: system
+    description: 系统/身份/辅助接口
+
+paths:
+  /apps/crm/api/ping:
+    get:
+      operationId: ping
+      summary: 健康检查 / 握手验证
+      tags: [system]
+      responses:
+        '200':
+          description: 服务存活信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  app: { type: string }
+                  version: { type: string }
+
+  /apps/crm/api/me:
+    get:
+      operationId: getCurrentUser
+      summary: 获取当前用户身份与是否管理员
+      tags: [system]
+      responses:
+        '200':
+          description: 当前用户
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      userId: { type: integer }
+                      isAdmin: { type: boolean }
+
+  /apps/crm/api/users:
+    get:
+      operationId: resolveUsers
+      summary: 批量解析用户昵称（负责人展示用）
+      tags: [system]
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: 逗号分隔的用户 ID 列表，如 1,2,3
+          schema: { type: string }
+      responses:
+        '200':
+          description: 用户信息数组
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userid: { type: integer }
+                        nickname: { type: string }
+
+  /apps/crm/api/options:
+    get:
+      operationId: listOptions
+      summary: 获取全部选项字典（客户状态 / 商机阶段，含已停用）
+      tags: [options]
+      responses:
+        '200':
+          description: 选项字典
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+
+  /apps/crm/api/my/follow-ups:
+    get:
+      operationId: listMyFollowUps
+      summary: 我的待跟进列表 + 概览统计
+      tags: [followups]
+      responses:
+        '200':
+          description: 我的待跟进与统计
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+
+  /apps/crm/api/dootask/projects:
+    get:
+      operationId: listDootaskProjects
+      summary: 列出可见的 DooTask 项目及其列表/列（创建关联任务用）
+      tags: [tasks]
+      responses:
+        '200':
+          description: 项目列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { type: object }
+
+  /apps/crm/api/customers:
+    get:
+      operationId: listCustomers
+      summary: 客户列表（按权限过滤，支持搜索/筛选/分页）
+      tags: [customers]
+      parameters:
+        - name: search
+          in: query
+          description: 关键字搜索（名称/公司等）
+          schema: { type: string }
+        - name: status
+          in: query
+          description: 客户状态过滤
+          schema: { type: string }
+        - name: owner_id
+          in: query
+          description: 负责人用户 ID 过滤
+          schema: { type: integer }
+        - name: page
+          in: query
+          description: 页码（需与 pageSize 同时提供才分页，否则返回全部）
+          schema: { type: integer }
+        - name: pageSize
+          in: query
+          description: 每页条数
+          schema: { type: integer }
+        - name: detail
+          in: query
+          description: 传 1 时附带最近一次跟进信息
+          schema: { type: string, enum: ['1'] }
+        - name: counts
+          in: query
+          description: 传 1 时附带各状态数量统计
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: 客户列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+    post:
+      operationId: createCustomer
+      summary: 新增客户
+      tags: [customers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, description: 客户名称（必填） }
+                company: { type: string, nullable: true }
+                status:
+                  type: string
+                  description: 客户状态，默认 lead；须为有效启用状态值
+                source: { type: string, nullable: true, description: 来源 }
+                tags: { type: string, nullable: true }
+                note: { type: string, nullable: true, description: 备注 }
+                owner_id:
+                  type: integer
+                  description: 负责人用户 ID，默认当前用户
+                next_follow_at:
+                  type: string
+                  nullable: true
+                  description: 下次跟进时间
+      responses:
+        '201':
+          description: 已创建的客户
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误
+
+  /apps/crm/api/customers/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: getCustomer
+      summary: 客户详情（聚合联系人/跟进/商机/关联任务）
+      tags: [customers]
+      responses:
+        '200':
+          description: 客户详情聚合
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      customer: { type: object }
+                      contacts: { type: array, items: { type: object } }
+                      opportunities: { type: array, items: { type: object } }
+                      follow_ups: { type: array, items: { type: object } }
+                      task_links: { type: array, items: { type: object } }
+        '403':
+          description: 无访问权限
+        '404':
+          description: 客户不存在
+    patch:
+      operationId: updateCustomer
+      summary: 更新客户
+      tags: [customers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                company: { type: string }
+                status: { type: string, description: 须为有效启用的客户状态值 }
+                source: { type: string }
+                tags: { type: string }
+                note: { type: string }
+                owner_id: { type: integer }
+                next_follow_at: { type: string }
+      responses:
+        '200':
+          description: 更新后的客户
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误
+        '403':
+          description: 无访问权限
+        '404':
+          description: 客户不存在
+    delete:
+      operationId: deleteCustomer
+      summary: 删除客户
+      tags: [customers]
+      responses:
+        '200':
+          description: 删除结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted: { type: boolean }
+        '403':
+          description: 无访问权限
+        '404':
+          description: 客户不存在
+
+  /apps/crm/api/contacts:
+    get:
+      operationId: listContacts
+      summary: 列出某客户的联系人
+      tags: [contacts]
+      parameters:
+        - name: customer_id
+          in: query
+          required: true
+          description: 客户 ID
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 联系人列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+        '400':
+          description: 缺少 customer_id
+        '403':
+          description: 无访问权限
+    post:
+      operationId: createContact
+      summary: 新增联系人
+      tags: [contacts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_id, name]
+              properties:
+                customer_id: { type: integer, description: 所属客户 ID（必填） }
+                name: { type: string, description: 联系人姓名（必填） }
+                title: { type: string, nullable: true, description: 职务 }
+                phone: { type: string, nullable: true }
+                email: { type: string, nullable: true }
+                is_primary: { type: boolean, description: 是否主联系人 }
+                note: { type: string, nullable: true }
+      responses:
+        '201':
+          description: 已创建的联系人
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误
+        '403':
+          description: 无访问权限
+
+  /apps/crm/api/contacts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      operationId: updateContact
+      summary: 更新联系人
+      tags: [contacts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                title: { type: string }
+                phone: { type: string }
+                email: { type: string }
+                note: { type: string }
+                is_primary: { type: boolean }
+      responses:
+        '200':
+          description: 更新后的联系人
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 联系人不存在或参数无效
+        '403':
+          description: 无访问权限
+    delete:
+      operationId: deleteContact
+      summary: 删除联系人
+      tags: [contacts]
+      responses:
+        '200':
+          description: 删除结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted: { type: boolean }
+        '403':
+          description: 无访问权限
+
+  /apps/crm/api/opportunities:
+    get:
+      operationId: listOpportunities
+      summary: 商机列表（按权限过滤，支持筛选/分页）
+      tags: [opportunities]
+      parameters:
+        - name: customer_id
+          in: query
+          description: 按客户过滤
+          schema: { type: integer }
+        - name: stage
+          in: query
+          description: 按阶段过滤
+          schema: { type: string }
+        - name: status
+          in: query
+          description: 按状态过滤（open/won/lost 等）
+          schema: { type: string }
+        - name: owner_id
+          in: query
+          description: 按负责人过滤
+          schema: { type: integer }
+        - name: search
+          in: query
+          description: 关键字搜索
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer }
+        - name: pageSize
+          in: query
+          schema: { type: integer }
+        - name: detail
+          in: query
+          description: 传 1 时附带最近一次跟进
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: 商机列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+    post:
+      operationId: createOpportunity
+      summary: 新增商机
+      tags: [opportunities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_id, title]
+              properties:
+                customer_id: { type: integer, description: 所属客户 ID（必填） }
+                title: { type: string, description: 商机标题（必填） }
+                stage: { type: string, description: 阶段，默认 initial；须为有效启用阶段值 }
+                status: { type: string, description: 状态，默认 open }
+                owner_id: { type: integer, description: 负责人，默认当前用户 }
+                amount: { type: number, nullable: true, description: 金额 }
+                expected_close_at: { type: string, nullable: true, description: 预计成交时间 }
+                next_follow_at: { type: string, nullable: true, description: 下次跟进时间 }
+      responses:
+        '201':
+          description: 已创建的商机
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误
+        '403':
+          description: 无访问权限
+
+  /apps/crm/api/opportunities/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: getOpportunity
+      summary: 商机详情（聚合客户/跟进/关联任务）
+      tags: [opportunities]
+      responses:
+        '200':
+          description: 商机详情聚合
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      opportunity: { type: object }
+                      customer: { type: object }
+                      follow_ups: { type: array, items: { type: object } }
+                      task_links: { type: array, items: { type: object } }
+        '403':
+          description: 无访问权限
+        '404':
+          description: 商机不存在
+    patch:
+      operationId: updateOpportunity
+      summary: 更新商机
+      tags: [opportunities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                stage: { type: string, description: 须为有效启用阶段值 }
+                status: { type: string }
+                owner_id: { type: integer }
+                amount: { type: number, nullable: true }
+                expected_close_at: { type: string }
+                lost_reason: { type: string, description: 丢单原因 }
+                next_follow_at: { type: string }
+      responses:
+        '200':
+          description: 更新后的商机
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误
+        '403':
+          description: 无访问权限
+        '404':
+          description: 商机不存在
+    delete:
+      operationId: deleteOpportunity
+      summary: 删除商机
+      tags: [opportunities]
+      responses:
+        '200':
+          description: 删除结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted: { type: boolean }
+        '403':
+          description: 无访问权限
+        '404':
+          description: 商机不存在
+
+  /apps/crm/api/follow-ups:
+    get:
+      operationId: listFollowUps
+      summary: 跟进时间线（按客户，可再按商机过滤）
+      tags: [followups]
+      parameters:
+        - name: customer_id
+          in: query
+          required: true
+          description: 客户 ID（必填）
+          schema: { type: integer }
+        - name: opportunity_id
+          in: query
+          description: 可选，按商机过滤
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 跟进记录列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+        '400':
+          description: 缺少 customer_id
+        '403':
+          description: 无访问权限
+    post:
+      operationId: createFollowUp
+      summary: 新增跟进记录
+      tags: [followups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_id, content]
+              properties:
+                customer_id: { type: integer, description: 客户 ID（必填） }
+                opportunity_id: { type: integer, nullable: true, description: 关联商机 ID（可选） }
+                content:
+                  type: string
+                  description: 跟进内容；支持纯文本或富文本 HTML（以 < 开头会被消毒）。正文有文字/图片/附件三者居一即可
+                attachments:
+                  type: array
+                  description: 附件列表（来自上传接口返回结构）
+                  items: { type: object }
+                next_follow_at: { type: string, nullable: true, description: 下次跟进时间 }
+      responses:
+        '201':
+          description: 已创建的跟进记录
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误（缺 customer_id 或内容为空）
+        '403':
+          description: 无访问权限
+
+  /apps/crm/api/task-links:
+    get:
+      operationId: listTaskLinks
+      summary: 列出实体（客户/商机）的关联任务
+      tags: [tasks]
+      parameters:
+        - name: entity_type
+          in: query
+          required: true
+          description: 实体类型
+          schema: { type: string, enum: [customer, opportunity] }
+        - name: entity_id
+          in: query
+          required: true
+          description: 实体 ID
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 关联任务列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+        '400':
+          description: 参数无效
+        '403':
+          description: 无访问权限
+    post:
+      operationId: createTaskLink
+      summary: 关联现有任务或创建并关联新任务
+      tags: [tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entity_type, entity_id]
+              properties:
+                entity_type:
+                  type: string
+                  enum: [customer, opportunity]
+                  description: 实体类型（必填）
+                entity_id: { type: integer, description: 实体 ID（必填） }
+                task_id:
+                  type: integer
+                  description: 关联现有任务时提供的任务 ID（与 create 二选一）
+                title:
+                  type: string
+                  description: 关联标题（可选）
+                create:
+                  type: object
+                  description: 创建并关联新任务时提供（与 task_id 二选一）
+                  properties:
+                    project_id: { type: integer, description: 目标项目 ID（必填） }
+                    column_id: { type: integer, nullable: true, description: 目标列 ID（可选） }
+                    name: { type: string, description: 新任务标题（必填） }
+      responses:
+        '201':
+          description: 已创建的关联（含可能的 warning）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误 / 创建任务失败 / 无权限接入任务聊天
+        '403':
+          description: 无访问权限
+
+  /apps/crm/api/task-links/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: deleteTaskLink
+      summary: 解除任务关联
+      tags: [tasks]
+      responses:
+        '200':
+          description: 删除结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted: { type: boolean }
+        '403':
+          description: 无访问权限
+
+  /apps/crm/api/uploads:
+    post:
+      operationId: uploadFile
+      summary: 上传图片/附件（multipart/form-data，字段名 file）
+      tags: [uploads]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 待上传文件（最大 20MB）
+      responses:
+        '201':
+          description: 上传结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      url: { type: string }
+                      size: { type: integer }
+                      mime: { type: string }
+        '400':
+          description: 缺少文件 / 非 multipart / 超过 20MB
+
+  /apps/crm/api/uploads/{name}:
+    get:
+      operationId: getUpload
+      summary: 内联查看或下载已上传文件
+      tags: [uploads]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 上传时返回的随机文件名
+          schema: { type: string }
+        - name: download
+          in: query
+          description: 存在该参数时强制作为附件下载
+          schema: { type: string }
+        - name: name
+          in: query
+          description: 下载时使用的原始文件名
+          schema: { type: string }
+      responses:
+        '200':
+          description: 文件二进制内容（图片内联，其余作附件下载）
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404':
+          description: 文件不存在
+
+  /apps/crm/api/admin/options/{category}:
+    parameters:
+      - name: category
+        in: path
+        required: true
+        description: 选项分类，如 customer_status / opportunity_stage
+        schema: { type: string }
+    get:
+      operationId: listOptionsByCategory
+      summary: 列出某分类选项（含已停用与使用计数，仅管理员）
+      tags: [settings]
+      responses:
+        '200':
+          description: 选项列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { type: object } }
+        '403':
+          description: 非管理员
+        '404':
+          description: 分类不存在
+    post:
+      operationId: createOption
+      summary: 新建选项（仅管理员）
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                label: { type: string, description: 选项名称（必填） }
+                tone: { type: string, description: 颜色/色调，默认 gray }
+      responses:
+        '201':
+          description: 已创建的选项
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误
+        '403':
+          description: 非管理员
+        '404':
+          description: 分类不存在
+
+  /apps/crm/api/admin/options/{category}/{id}:
+    parameters:
+      - name: category
+        in: path
+        required: true
+        schema: { type: string }
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      operationId: updateOption
+      summary: 改名/改色、停用/启用或排序选项（仅管理员）
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 三种用法互斥；提供 move 排序、提供 archived 停用/启用、否则按 label/tone 改名改色
+              properties:
+                label: { type: string, description: 改名 }
+                tone: { type: string, description: 改色 }
+                archived: { type: boolean, description: 停用(true)/启用(false) }
+                move: { type: string, enum: [up, down], description: 排序 }
+      responses:
+        '200':
+          description: 更新后的选项
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误
+        '403':
+          description: 非管理员
+        '404':
+          description: 分类或选项不存在
+    delete:
+      operationId: deleteOption
+      summary: 删除选项（仅未被使用时，仅管理员）
+      tags: [settings]
+      responses:
+        '200':
+          description: 删除结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted: { type: boolean }
+        '400':
+          description: 选项正在被使用，无法删除
+        '403':
+          description: 非管理员
+        '404':
+          description: 分类或选项不存在
+
+  /apps/crm/api/admin/settings:
+    get:
+      operationId: getSettings
+      summary: 读取动态推送配置（token 脱敏，仅管理员）
+      tags: [settings]
+      responses:
+        '200':
+          description: 设置视图
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      bot_configured: { type: boolean }
+                      bot_userid: { type: integer, nullable: true }
+                      bot_name: { type: string, nullable: true }
+                      notify_enabled: { type: boolean }
+        '403':
+          description: 非管理员
+    put:
+      operationId: updateSettings
+      summary: 更新机器人与通知配置（仅管理员）
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bot_token:
+                  type: string
+                  description: 机器人 Token；空串=重置，非空=校验后保存，不传=不动
+                bot_name:
+                  type: string
+                  description: 机器人名称（2-20 个字符）
+                notify_enabled:
+                  type: boolean
+                  description: 是否启用动态推送
+      responses:
+        '200':
+          description: 更新后的设置视图
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '400':
+          description: 参数错误（token 无效 / 名称长度不合法等）
+        '403':
+          description: 非管理员
+
+  /apps/crm/api/admin/run-reminder:
+    post:
+      operationId: runFollowReminder
+      summary: 手动触发跟进到期提醒（仅管理员）
+      tags: [settings]
+      responses:
+        '200':
+          description: 提醒任务执行结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '403':
+          description: 非管理员
+
+  /apps/crm/api/admin/backups:
+    get:
+      operationId: listBackups
+      summary: 备份列表（仅管理员）
+      tags: [backup]
+      responses:
+        '200':
+          description: 备份列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { type: object } }
+        '403':
+          description: 非管理员
+    post:
+      operationId: createBackup
+      summary: 立即生成一份备份（仅管理员）
+      tags: [backup]
+      responses:
+        '200':
+          description: 新备份条目
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+        '403':
+          description: 非管理员
+
+  /apps/crm/api/admin/backups/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        description: 备份文件名
+        schema: { type: string }
+    get:
+      operationId: downloadBackup
+      summary: 下载备份文件（仅管理员）
+      tags: [backup]
+      responses:
+        '200':
+          description: 备份文件二进制
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '403':
+          description: 非管理员
+        '404':
+          description: 备份不存在
+    post:
+      operationId: restoreBackup
+      summary: 用该备份还原数据库（危险操作，仅管理员）
+      tags: [backup]
+      x-doo-cli: false
+      responses:
+        '200':
+          description: 还原结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      restored: { type: boolean }
+        '403':
+          description: 非管理员
+        '404':
+          description: 备份不存在
+    delete:
+      operationId: deleteBackup
+      summary: 删除该备份（仅管理员）
+      tags: [backup]
+      responses:
+        '200':
+          description: 删除结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted: { type: boolean }
+        '403':
+          description: 非管理员
+        '404':
+          description: 备份不存在

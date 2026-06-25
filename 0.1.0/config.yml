@@ -14,7 +14,7 @@ menu_items:
       en: CRM
       zh: 客户关系管理
     url: "apps/crm/?theme={system_theme}&lang={system_lang}&user_id={user_id}&user_token={user_token}"
-    type: iframe
+    url_type: iframe
     immersive: true
 
 # AI 助手知识库：随包发布，安装后并入产品内 AI 助手检索

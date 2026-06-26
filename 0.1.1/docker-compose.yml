@@ -1,0 +1,13 @@
+services:
+  crm:
+    image: "dootask/crm:${PLUGIN_VERSION}"
+    restart: unless-stopped
+    environment:
+      - TZ=${TIMEZONE:-PRC}
+      - CRM_ADMIN_USER_IDS=${CRM_ADMIN_USER_IDS}
+      - CRM_VERSION=${PLUGIN_VERSION}
+    volumes:
+      - crm-data:/app/data
+
+volumes:
+  crm-data:

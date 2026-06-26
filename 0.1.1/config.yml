@@ -1,0 +1,27 @@
+fields:
+  - name: CRM_ADMIN_USER_IDS
+    label:
+      en: Administrator
+      zh: 管理员
+    placeholder:
+      en: Select users with admin privileges
+      zh: 选择具有管理员权限的用户
+    type: user_select
+
+menu_items:
+  - location: application
+    label:
+      en: CRM
+      zh: 客户关系管理
+    url: "apps/crm/?theme={system_theme}&lang={system_lang}&user_id={user_id}&user_token={user_token}"
+    type: iframe
+    immersive: true
+
+# AI 助手知识库：随包发布，安装后并入产品内 AI 助手检索
+knowledge_base: ./ai-kb
+
+# 应用指令接口：声明 OpenAPI 规范，支持 doo app call crm <指令>
+openapi:
+  file: ./openapi.yaml
+  service: crm
+  port: 3000

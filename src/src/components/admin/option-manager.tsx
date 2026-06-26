@@ -172,7 +172,7 @@ export function OptionManager({
                     key={item.id}
                     className="flex flex-wrap items-center gap-3 px-4 py-3"
                   >
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-2 flex-wrap">
                       <ToneBadge tone={item.tone as Tone}>
                         {item.label}
                       </ToneBadge>

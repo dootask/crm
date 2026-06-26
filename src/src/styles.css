@@ -4,6 +4,14 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* 移动端安全区域（刘海/状态栏 + 底部 Home 指示条）。
+     默认用 CSS env() 兜底（独立浏览器直开时生效）；在 DooTask 微前端里由
+     lib/dootask.ts 握手后用 getSafeArea() 的像素值覆盖（桌面宿主为 0）。 */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* 主程序在 iframe 右上角叠加的悬浮胶囊（返回/更多）避让高度。
+     仅在移动宿主（--safe-top > 0）由 lib/dootask.ts 置为非 0，桌面/独立保持 0，不影响布局。 */
+  --capsule-reserve: 0px;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);

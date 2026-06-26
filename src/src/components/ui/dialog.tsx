@@ -60,6 +60,10 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          // 移动端安全区域：限高在安全可视区内并内部滚动，内容再高也不会被顶进刘海/压住 Home 条；
+          // mt 把居中点在安全带内整体下移，让弹窗顶部落在右上角胶囊之下（避免胶囊盖住关闭键）。
+          // 桌面/独立时各变量为 0，等价于普通垂直居中。
+          "max-h-[calc(100dvh-var(--safe-top)-var(--safe-bottom)-var(--capsule-reserve)-2rem)] mt-[calc((var(--safe-top)+var(--capsule-reserve)-var(--safe-bottom))/2)] overflow-y-auto",
           className
         )}
         {...props}

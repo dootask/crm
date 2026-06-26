@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type * as DooTaskTools from '@dootask/tools'
 import { setAuth } from '#/lib/api'
+import { setSafeInsets } from '#/lib/safe-area'
 
 export interface DooTaskUser {
   userid: number
@@ -59,6 +60,21 @@ export function useDooTask(): DooTaskState {
           root.style.colorScheme = dark ? 'dark' : 'light'
         } catch {
           /* 主题获取失败不影响主流程 */
+        }
+        // 同步移动端安全区域：主程序通过 props.safeArea 注入 {top,bottom}（px，桌面宿主为 0）。
+        // 写到 <html> 的 CSS 变量供布局让位；并镜像数值给浮层 collisionPadding（见 lib/safe-area）。
+        try {
+          const sa = await tools.getSafeArea()
+          const top = Math.max(0, Number(sa.top) || 0)
+          const bottom = Math.max(0, Number(sa.bottom) || 0)
+          const root = document.documentElement
+          root.style.setProperty('--safe-top', `${top}px`)
+          root.style.setProperty('--safe-bottom', `${bottom}px`)
+          // 胶囊只在有顶部安全区的移动宿主才需要避让；桌面宿主 top=0 保持 0，不影响布局。
+          root.style.setProperty('--capsule-reserve', top > 0 ? '48px' : '0px')
+          setSafeInsets({ top, bottom })
+        } catch {
+          /* 非移动端会抛 UnsupportedError，保持 CSS env() 兜底值即可 */
         }
         const typedUser = user as unknown as DooTaskUser
         // 写入全局鉴权状态，供 lib/api 的 api() 自动带上身份头。

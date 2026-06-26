@@ -39,7 +39,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <OptionsProvider>
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
+      {/* 顶栏让出顶部安全区：背景上延盖住刘海/状态栏，导航内容落在其下。
+          导航靠左，右上角天然给主程序胶囊留空（今后若加右侧按钮需 pr 让出 --capsule-reserve）。 */}
+      <header className="sticky top-0 z-40 border-b bg-background/80 pt-[var(--safe-top)] backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 max-sm:gap-1.5 max-sm:px-3">
           <UserAvatar user={user} />
           <nav className="ml-1 flex items-center gap-1 max-sm:ml-0.5">
@@ -63,7 +65,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      {/* 正文底部让出安全区，避免最底内容被 Home 指示条遮挡（详情页也走此 main）。 */}
+      <main className="mx-auto max-w-5xl px-4 pt-6 pb-[calc(1.5rem+var(--safe-bottom))]">
+        {children}
+      </main>
     </div>
     </OptionsProvider>
   )

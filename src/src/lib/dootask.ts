@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type * as DooTaskTools from '@dootask/tools'
-import { setAuth } from '#/lib/api'
+import { isAuthReady, onAuthReady, setAuth } from '#/lib/api'
 import { setSafeInsets } from '#/lib/safe-area'
 
 export interface DooTaskUser {
@@ -90,6 +90,8 @@ export function useDooTask(): DooTaskState {
           })
         }
       } catch (e) {
+        // 握手失败也要放行请求（按匿名/降级处理），否则首屏取数守卫会一直挂起。
+        setAuth({ userId: null, token: null })
         const tools = await import('@dootask/tools').catch(() => null)
         if (tools && e instanceof tools.UnsupportedError) {
           if (!cancelled) setState((s) => ({ ...s, status: 'standalone' }))
@@ -106,6 +108,17 @@ export function useDooTask(): DooTaskState {
   }, [])
 
   return state
+}
+
+/**
+ * 首屏取数守卫：返回「握手是否已完成」。
+ * 常驻视图（仪表盘/客户/商机列表）在挂载时就会取数，若不等身份头写入，
+ * 请求会以匿名身份发出。用它 gate 首拉，身份就绪后再放行。
+ */
+export function useAuthReady(): boolean {
+  const [ready, setReady] = useState(isAuthReady())
+  useEffect(() => onAuthReady(() => setReady(true)), [])
+  return ready
 }
 
 export type PickUsersResult =

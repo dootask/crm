@@ -10,8 +10,10 @@ function adminIds(): Array<number> {
 /**
  * 解析当前请求用户。
  * - 前端 apiFetch 会带上 `x-user-id`（来自 @dootask/tools 的 getUserInfo），服务端据此判定身份与归属。
- * - 缺失（本地/独立模式直接访问）时回退到种子用户，便于离线查看演示数据。
  * - 管理员 = 用户 ID 在 CRM_ADMIN_USER_IDS 中；未配置管理员时所有人按管理员处理（单人/演示场景）。
+ * - 已配置管理员却拿不到身份（缺 x-user-id/uid）时，视为匿名（userId=0、非管理员、无归属），
+ *   而**不再**回退成「第一个管理员」——否则任何漏带身份头的请求（含前端握手前的抢跑请求、
+ *   直接 curl）都会被当成管理员而看到全部数据。
  *
  * 注：插件运行在 DooTask iframe 内、已由主程序鉴权，这里采用「信任前端传入的 user-id」
  * 的轻量模型（与官方 asset-hub 一致）。如需更强校验，可在此用 dootask-server 的
@@ -30,10 +32,18 @@ export function resolveUser(request: Request): AuthUser {
   }
   const parsed = raw ? parseInt(raw, 10) : NaN
   const admins = adminIds()
-  const fallback = admins[0] ?? 1
-  const userId = Number.isFinite(parsed) ? parsed : fallback
-  const isAdmin = admins.length === 0 || admins.includes(userId)
-  return { userId, isAdmin }
+
+  // 未配置管理员：单人/演示/无头本地场景，所有人按管理员处理，缺身份回退到种子用户（1）。
+  if (admins.length === 0) {
+    return { userId: Number.isFinite(parsed) ? parsed : 1, isAdmin: true }
+  }
+
+  // 已配置管理员：必须能识别出用户身份。缺失/非法一律按匿名处理——
+  // userId=0 不匹配任何真实归属（owner_id ≥ 1），isAdmin=false，看不到任何数据。
+  if (!Number.isFinite(parsed)) {
+    return { userId: 0, isAdmin: false }
+  }
+  return { userId: parsed, isAdmin: admins.includes(parsed) }
 }
 
 /** 是否可访问/修改某条归属 ownerId 的数据。 */

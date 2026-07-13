@@ -8,8 +8,35 @@ let _auth: { userId: number | null; token: string | null } = {
   token: null,
 }
 
+// 握手是否已完成（setAuth 至少被调用一次，含独立/降级模式的空身份）。
+// 首屏取数需等它为真，否则请求会抢在身份头写入之前发出、被服务端按匿名处理。
+let _authReady = false
+const _authReadyListeners = new Set<() => void>()
+
 export function setAuth(auth: { userId: number | null; token: string | null }) {
   _auth = auth
+  if (!_authReady) {
+    _authReady = true
+    for (const fn of _authReadyListeners) fn()
+    _authReadyListeners.clear()
+  }
+}
+
+/** 握手是否已完成。 */
+export function isAuthReady(): boolean {
+  return _authReady
+}
+
+/** 订阅「握手完成」；已完成则同步回调。返回取消订阅函数。 */
+export function onAuthReady(fn: () => void): () => void {
+  if (_authReady) {
+    fn()
+    return () => {}
+  }
+  _authReadyListeners.add(fn)
+  return () => {
+    _authReadyListeners.delete(fn)
+  }
 }
 
 export function getAuthUserId(): number | null {

@@ -8,35 +8,42 @@ let _auth: { userId: number | null; token: string | null } = {
   token: null,
 }
 
-// 握手是否已完成（setAuth 至少被调用一次，含独立/降级模式的空身份）。
-// 首屏取数需等它为真，否则请求会抢在身份头写入之前发出、被服务端按匿名处理。
+// 握手闸门：任何请求发出前都要等 setAuth/releaseAuthGate 至少被调用一次，
+// 否则会抢在 @dootask/tools 握手（异步写入身份头）之前以匿名身份发出，
+// 被服务端按匿名处理（详情页/管理页直接打开或刷新时尤为明显）。
 let _authReady = false
-const _authReadyListeners = new Set<() => void>()
+let _resolveReady: () => void = () => {}
+const _readyPromise = new Promise<void>((resolve) => {
+  _resolveReady = resolve
+})
+
+function markReady() {
+  if (_authReady) return
+  _authReady = true
+  _resolveReady()
+}
 
 export function setAuth(auth: { userId: number | null; token: string | null }) {
+  // 不允许用空身份覆盖已确立的有效身份：并发/重复握手其一失败或降级时，
+  // 不应把另一次成功写入的真实用户清空。
+  if (auth.userId == null && _auth.userId != null) {
+    markReady()
+    return
+  }
   _auth = auth
-  if (!_authReady) {
-    _authReady = true
-    for (const fn of _authReadyListeners) fn()
-    _authReadyListeners.clear()
-  }
+  markReady()
 }
 
-/** 握手是否已完成。 */
-export function isAuthReady(): boolean {
-  return _authReady
+/** 握手彻底失败时释放闸门（保留现有身份不动），避免请求永久挂起。 */
+export function releaseAuthGate() {
+  markReady()
 }
 
-/** 订阅「握手完成」；已完成则同步回调。返回取消订阅函数。 */
-export function onAuthReady(fn: () => void): () => void {
-  if (_authReady) {
-    fn()
-    return () => {}
-  }
-  _authReadyListeners.add(fn)
-  return () => {
-    _authReadyListeners.delete(fn)
-  }
+/** 等握手完成再放行请求；SSR（无 window）下不等待，避免服务端渲染挂起。 */
+async function whenAuthReady(): Promise<void> {
+  if (_authReady) return
+  if (typeof window === 'undefined') return
+  await _readyPromise
 }
 
 export function getAuthUserId(): number | null {
@@ -63,6 +70,8 @@ export async function api<T = unknown>(
   path: string,
   init?: RequestInit & { json?: unknown },
 ): Promise<T> {
+  // 统一在此等握手完成，覆盖所有页面（含详情/管理页），不必逐个组件加守卫。
+  await whenAuthReady()
   const headers: Record<string, string> = {
     ...authHeaders(),
     ...(init?.headers as Record<string, string> | undefined),

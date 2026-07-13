@@ -12,7 +12,7 @@ import type {
 import { useOpportunityStageOptions } from '#/lib/use-options'
 import { formatDate, formatMoney, isOverdue, plainExcerpt } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
-import { pickUsers, useAuthReady } from '#/lib/dootask'
+import { pickUsers } from '#/lib/dootask'
 import { messageError } from '#/lib/message'
 import { linkPendingTasks } from '#/components/detail/task-picker-dialog.tsx'
 import type { TaskSelection } from '#/components/detail/task-picker-dialog.tsx'
@@ -66,7 +66,6 @@ export function OpportunitiesView({ active }: { active: boolean }) {
     'simple',
   )
   const stageOptions = useOpportunityStageOptions()
-  const authReady = useAuthReady()
 
   // 搜索防抖
   useEffect(() => {
@@ -108,18 +107,16 @@ export function OpportunitiesView({ active }: { active: boolean }) {
     }
   }
 
-  // 初次挂载 + 筛选 / 页码变化时加载。等握手完成再首拉，避免匿名请求。
+  // 初次挂载 + 筛选 / 页码变化时加载
   useEffect(() => {
-    if (!authReady) return
     reload()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, status, debounced, page, pageSize, authReady])
+  }, [stage, status, debounced, page, pageSize])
 
-  // 客户列表只需拉一次（同样等握手完成）
+  // 客户列表只需拉一次
   useEffect(() => {
-    if (!authReady) return
     loadCustomers()
-  }, [authReady])
+  }, [])
 
   // 切回本视图时后台刷新
   useActivate(active, () => {

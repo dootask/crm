@@ -6,7 +6,7 @@ import type { Customer, CustomerStatus } from '#/lib/types'
 import { useCustomerStatusOptions } from '#/lib/use-options'
 import { formatDate, isOverdue, plainExcerpt } from '#/lib/format'
 import { useUserNames } from '#/lib/use-users'
-import { pickUsers, useAuthReady } from '#/lib/dootask'
+import { pickUsers } from '#/lib/dootask'
 import { messageError } from '#/lib/message'
 import { linkPendingTasks } from '#/components/detail/task-picker-dialog.tsx'
 import type { TaskSelection } from '#/components/detail/task-picker-dialog.tsx'
@@ -73,7 +73,6 @@ export function CustomersView({ active }: { active: boolean }) {
   )
   const [createOpen, setCreateOpen] = useState(false)
   const statusOptions = useCustomerStatusOptions()
-  const authReady = useAuthReady()
 
   // 最新查询条件 ref，供 reloadList / 保活刷新读取，避免闭包过期。
   const debouncedRef = useRef(debounced)
@@ -118,11 +117,10 @@ export function CustomersView({ active }: { active: boolean }) {
     return () => clearTimeout(t)
   }, [search])
 
-  // 查询条件或页码变化时加载（含首次挂载）。等握手完成再首拉，避免匿名请求。
+  // 查询条件或页码变化时加载（含首次挂载）。
   useEffect(() => {
-    if (!authReady) return
     reloadList()
-  }, [debounced, status, page, pageSize, authReady])
+  }, [debounced, status, page, pageSize])
 
   // 切回本视图时后台刷新当前页。
   useActivate(active, reloadList)

@@ -18,7 +18,7 @@ import {
 import { ToneBadge } from '#/components/ui/badge.tsx'
 import { EmptyState, Loading, PageHeader } from '#/components/ui/misc.tsx'
 import { ApiError, api } from '#/lib/api'
-import { useAuthReady, useDooTask } from '#/lib/dootask'
+import { useDooTask } from '#/lib/dootask'
 import { formatDate, formatMoney } from '#/lib/format'
 import { cn } from '#/lib/utils'
 
@@ -86,7 +86,6 @@ function StatCard({
 
 export function DashboardView({ active }: { active: boolean }) {
   const dootask = useDooTask()
-  const authReady = useAuthReady()
   const [data, setData] = useState<FollowUpsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -104,11 +103,9 @@ export function DashboardView({ active }: { active: boolean }) {
     }
   }
 
-  // 等握手完成再首拉，避免抢在身份头写入前以匿名身份请求。
   useEffect(() => {
-    if (!authReady) return
     reload()
-  }, [authReady])
+  }, [])
 
   useActivate(active, reload)
 

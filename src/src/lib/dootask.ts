@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type * as DooTaskTools from '@dootask/tools'
-import { isAuthReady, onAuthReady, setAuth } from '#/lib/api'
+import { releaseAuthGate, setAuth } from '#/lib/api'
 import { setSafeInsets } from '#/lib/safe-area'
 
 export interface DooTaskUser {
@@ -18,107 +18,109 @@ export interface DooTaskState {
   token: string | null
 }
 
+// 模块级共享握手：整个应用只与主程序握手一次。
+// 之前每个 useDooTask() 各自 boot() 会重复 appReady/getUserInfo/主题同步，
+// 且并发失败分支可能互相覆盖身份；收敛为单例后只有一条权威写入路径。
+const INITIAL_STATE: DooTaskState = {
+  status: 'loading',
+  user: null,
+  token: null,
+}
+let sharedState: DooTaskState = INITIAL_STATE
+const subscribers = new Set<(s: DooTaskState) => void>()
+let handshake: Promise<void> | null = null
+
+function emit(next: DooTaskState) {
+  sharedState = next
+  for (const fn of subscribers) fn(next)
+}
+
 /**
  * 与主程序握手：appReady() 后取当前用户信息。
  * - 在 DooTask 微前端里：status=ready，user 为当前登录用户。
  * - 直接浏览器打开（脱离宿主）：捕获 UnsupportedError，status=standalone。
  * @dootask/tools 是浏览器侧库，动态 import 以避免 SSR 阶段触碰 window。
  */
+async function runHandshake(): Promise<void> {
+  try {
+    const tools = await import('@dootask/tools')
+    const micro = await tools.isMicroApp()
+    if (!micro) {
+      // 独立模式：不带身份头，服务端回退到种子用户便于离线查看。
+      setAuth({ userId: null, token: null })
+      emit({ status: 'standalone', user: null, token: null })
+      return
+    }
+    await tools.appReady()
+    const [user, token] = await Promise.all([
+      tools.getUserInfo(),
+      tools.getUserToken().catch(() => null),
+    ])
+    // 同步主程序主题到 <html>
+    try {
+      const theme = await tools.getThemeName()
+      const dark = String(theme).includes('dark')
+      const root = document.documentElement
+      root.classList.toggle('dark', dark)
+      root.classList.toggle('light', !dark)
+      // 同步 color-scheme，否则首屏内联脚本写的旧值会残留（如 light 主题下仍 color-scheme: dark）。
+      root.style.colorScheme = dark ? 'dark' : 'light'
+    } catch {
+      /* 主题获取失败不影响主流程 */
+    }
+    // 同步移动端安全区域：主程序通过 props.safeArea 注入 {top,bottom}（px，桌面宿主为 0）。
+    // 写到 <html> 的 CSS 变量供布局让位；并镜像数值给浮层 collisionPadding（见 lib/safe-area）。
+    try {
+      const sa = await tools.getSafeArea()
+      const top = Math.max(0, Number(sa.top) || 0)
+      const bottom = Math.max(0, Number(sa.bottom) || 0)
+      const root = document.documentElement
+      root.style.setProperty('--safe-top', `${top}px`)
+      root.style.setProperty('--safe-bottom', `${bottom}px`)
+      // 胶囊只在有顶部安全区的移动宿主才需要避让；桌面宿主 top=0 保持 0，不影响布局。
+      root.style.setProperty('--capsule-reserve', top > 0 ? '48px' : '0px')
+      setSafeInsets({ top, bottom })
+    } catch {
+      /* 非移动端会抛 UnsupportedError，保持 CSS env() 兜底值即可 */
+    }
+    const typedUser = user as unknown as DooTaskUser
+    // 写入全局鉴权状态，供 lib/api 的 api() 自动带上身份头。
+    setAuth({ userId: typedUser.userid, token: token ?? null })
+    emit({ status: 'ready', user: typedUser, token: token ?? null })
+  } catch (e) {
+    const tools = await import('@dootask/tools').catch(() => null)
+    if (tools && e instanceof tools.UnsupportedError) {
+      setAuth({ userId: null, token: null })
+      emit({ status: 'standalone', user: null, token: null })
+    } else {
+      // 真·握手失败：只释放 API 闸门、不改动身份（此处本无成功身份，
+      // 也不能覆盖别处可能已成功写入的用户），避免请求永久挂起。
+      releaseAuthGate()
+      emit({ status: 'error', user: null, token: null })
+    }
+  }
+}
+
+function ensureHandshake() {
+  if (!handshake) handshake = runHandshake()
+  return handshake
+}
+
+/** 订阅共享握手状态；首个订阅者触发唯一一次握手。 */
 export function useDooTask(): DooTaskState {
-  const [state, setState] = useState<DooTaskState>({
-    status: 'loading',
-    user: null,
-    token: null,
-  })
+  const [state, setState] = useState<DooTaskState>(sharedState)
 
   useEffect(() => {
-    let cancelled = false
-
-    async function boot() {
-      try {
-        const tools = await import('@dootask/tools')
-        const micro = await tools.isMicroApp()
-        if (!micro) {
-          // 独立模式：不带身份头，服务端回退到种子用户便于离线查看。
-          setAuth({ userId: null, token: null })
-          if (!cancelled) setState((s) => ({ ...s, status: 'standalone' }))
-          return
-        }
-        await tools.appReady()
-        const [user, token] = await Promise.all([
-          tools.getUserInfo(),
-          tools.getUserToken().catch(() => null),
-        ])
-        // 同步主程序主题到 <html>
-        try {
-          const theme = await tools.getThemeName()
-          const dark = String(theme).includes('dark')
-          const root = document.documentElement
-          root.classList.toggle('dark', dark)
-          root.classList.toggle('light', !dark)
-          // 同步 color-scheme，否则首屏内联脚本写的旧值会残留（如 light 主题下仍 color-scheme: dark）。
-          root.style.colorScheme = dark ? 'dark' : 'light'
-        } catch {
-          /* 主题获取失败不影响主流程 */
-        }
-        // 同步移动端安全区域：主程序通过 props.safeArea 注入 {top,bottom}（px，桌面宿主为 0）。
-        // 写到 <html> 的 CSS 变量供布局让位；并镜像数值给浮层 collisionPadding（见 lib/safe-area）。
-        try {
-          const sa = await tools.getSafeArea()
-          const top = Math.max(0, Number(sa.top) || 0)
-          const bottom = Math.max(0, Number(sa.bottom) || 0)
-          const root = document.documentElement
-          root.style.setProperty('--safe-top', `${top}px`)
-          root.style.setProperty('--safe-bottom', `${bottom}px`)
-          // 胶囊只在有顶部安全区的移动宿主才需要避让；桌面宿主 top=0 保持 0，不影响布局。
-          root.style.setProperty('--capsule-reserve', top > 0 ? '48px' : '0px')
-          setSafeInsets({ top, bottom })
-        } catch {
-          /* 非移动端会抛 UnsupportedError，保持 CSS env() 兜底值即可 */
-        }
-        const typedUser = user as unknown as DooTaskUser
-        // 写入全局鉴权状态，供 lib/api 的 api() 自动带上身份头。
-        setAuth({
-          userId: typedUser.userid,
-          token: token ?? null,
-        })
-        if (!cancelled) {
-          setState({
-            status: 'ready',
-            user: typedUser,
-            token: token ?? null,
-          })
-        }
-      } catch (e) {
-        // 握手失败也要放行请求（按匿名/降级处理），否则首屏取数守卫会一直挂起。
-        setAuth({ userId: null, token: null })
-        const tools = await import('@dootask/tools').catch(() => null)
-        if (tools && e instanceof tools.UnsupportedError) {
-          if (!cancelled) setState((s) => ({ ...s, status: 'standalone' }))
-        } else if (!cancelled) {
-          setState((s) => ({ ...s, status: 'error' }))
-        }
-      }
-    }
-
-    boot()
+    subscribers.add(setState)
+    // 挂载时对齐当前共享态（握手可能在本组件挂载前已完成）。
+    setState(sharedState)
+    ensureHandshake()
     return () => {
-      cancelled = true
+      subscribers.delete(setState)
     }
   }, [])
 
   return state
-}
-
-/**
- * 首屏取数守卫：返回「握手是否已完成」。
- * 常驻视图（仪表盘/客户/商机列表）在挂载时就会取数，若不等身份头写入，
- * 请求会以匿名身份发出。用它 gate 首拉，身份就绪后再放行。
- */
-export function useAuthReady(): boolean {
-  const [ready, setReady] = useState(isAuthReady())
-  useEffect(() => onAuthReady(() => setReady(true)), [])
-  return ready
 }
 
 export type PickUsersResult =
